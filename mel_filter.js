@@ -13,9 +13,9 @@ let mel_filter = function() {
   let _highMel;
   let _dMel;
 
-  let _m = []; // mel filter points (equally spaced in mel space)
-  let _h = []; // filter points in frequency domain
-  let _f = []; // map _h to nearest FT bin
+  let _m = [];  // mel filter points (equally spaced in mel space)
+  let _h = [];  // filter points in frequency domain
+  let _f = [];  // map _h to nearest FT bin
   let _Hm = []; // 2d array [index frequency domain][mel filter id] -> mel filter id [0, ..., _nMel-1]
 
   function init(samplerate, nfft, lowFreq, highFreq, nMel) {
@@ -52,9 +52,6 @@ let mel_filter = function() {
   }
 
   function createFilterbanks() {
-    // loop over all frequency bins
-
-    let m = 1;
 
     for (let m = 1; m <= _nMel; m++) {
       let H = [];
@@ -89,6 +86,26 @@ let mel_filter = function() {
     return 700 * (Math.pow(10, m / 2595) - 1);
   }
 
+  function getMelCoefficient(mIdx, buffer) {
+    assert( _Hm[mIdx].length == buffer.length );
+
+    let coeff = 0;
+    for(let idx=0; idx<buffer.length; idx++) {
+      coeff += _Hm[mIdx][idx] * buffer[idx];
+    }
+    return coeff;
+  }
+
+  function getLogMelCoefficients(buffer) {
+    
+    let melArray = [];
+    for(let mIdx=0; mIdx<_nMel; mIdx++) {
+      melArray.push( Math.log10(getMelCoefficient(mIdx, buffer)) );
+    }
+
+    return melArray;
+  }
+
   function print() {
     console.log(_m);
     console.log(_h);
@@ -99,36 +116,7 @@ let mel_filter = function() {
   return {
     init: init,
     print: print,
-    getFilterBank: getFilterBank
+    getFilterBank: getFilterBank,
+    getLogMelCoefficients: getLogMelCoefficients
   };
 };
-
-const TIMEDOMAINSIZE = 512;
-const FEQUENCYDOMAINSIZE = TIMEDOMAINSIZE / 2 + 1;
-const nFilter = 10;
-
-const filter = mel_filter();
-filter.init(16000, TIMEDOMAINSIZE, 0, 8000, nFilter);
-//filter.print();
-console.log(filter.getFilterBank(0));
-
-let graph_div = document.getElementById('div_g1');
-let mag_div = document.getElementById('div_g2');
-let phase_div = document.getElementById('div_g3');
-let inverse_div = document.getElementById('div_g4');
-
-data = [];
-for (let idx = 0; idx < FEQUENCYDOMAINSIZE; idx++) {
-  let dummy = [];
-  for (let m = 0; m <= nFilter - 1; m++) {
-    let fb = filter.getFilterBank(m);
-    dummy.push(fb[idx]);
-  }
-  data.push([idx, ...dummy]);
-}
-
-let graph1 = new Dygraph(graph_div, data, {
-  drawPoints: true,
-  showRoller: true,
-  valueRange: [0, 1.0]
-});

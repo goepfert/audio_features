@@ -1,3 +1,7 @@
+/**
+ * Collection of some usefull functions
+ */
+
 function decibelsToLinear(decibels) {
   return Math.pow(10, 0.05 * decibels);
 }
