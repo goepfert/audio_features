@@ -1,3 +1,5 @@
+const context = new AudioContext();
+
 // Get a canvas defined with ID "oscilloscope"
 const canvas = document.getElementById('oscilloscope');
 canvas.width = 600;
@@ -9,6 +11,11 @@ const context_fftSeries = canvas_fftSeries.getContext('2d');
 canvas_fftSeries.width = 600;
 canvas_fftSeries.height = 300;
 
+const canvas_fftSeries_mel = document.getElementById('fft-series mel');
+const context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
+canvas_fftSeries_mel.width = 600;
+canvas_fftSeries_mel.height = 300;
+
 // FT Stuff
 // 48 kHz sampling rate, 1024 samples => 21.3 ms
 const BUFFERSIZE = 256;
@@ -16,15 +23,23 @@ const B2P1 = BUFFERSIZE / 2 + 1;
 const dft = new DFT(BUFFERSIZE);
 let timeDomainData = [];
 
-// How many frames of size BUFFERSIZE
-const FRAMESIZE = 200;
+const FRAMESIZE = 200; // How many frames of size BUFFERSIZE
+const nMelFilter = 26; // Number of Mel Filterbanks
 let DFT_Series = []; // ringbuffer
+let DFT_Series_mel = []; // ringbuffer
 let DFT_Series_pos = FRAMESIZE - 1; // head of ringbuffer
 
-// Prefill array
+const filter = mel_filter();
+let samplerate = context.sampleRate;
+filter.init(samplerate, BUFFERSIZE, 0, samplerate / 2, nMelFilter);
+
+// Prefill arrays
 for (let idx = 0; idx < FRAMESIZE; idx++) {
   let ft_array = Array.from(Array(B2P1), () => 0);
   DFT_Series.push(ft_array);
+
+  let mel_array = Array.from(Array(nMelFilter), () => 0);
+  DFT_Series_mel.push(mel_array);
 }
 
 // Color map css style
@@ -38,7 +53,6 @@ for (let idx = 0; idx < 256; idx++) {
  */
 const handleSuccess = function(stream) {
   console.log('handle success');
-  const context = new AudioContext();
   const source = context.createMediaStreamSource(stream);
 
   // Create a ScriptProcessorNode
@@ -83,6 +97,9 @@ const handleSuccess = function(stream) {
       mag = Math.floor(mag);
       DFT_Series[DFT_Series_pos][idx] = mag;
     }
+
+    // Copy aaray of mel coefficients
+    DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getMelCoefficients(dft.mag));
   };
 };
 
@@ -99,7 +116,7 @@ navigator.mediaDevices
  * Called as fast as possible by the browser (as far as I understood)
  */
 let counter = -1;
-let drawEveryFrame = 3;
+let drawEveryFrame = 1;
 const draw = function() {
   requestAnimationFrame(draw);
 
@@ -112,23 +129,16 @@ const draw = function() {
   canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Draw magnitudes
-  let barWidthLin = canvas.width / B2P1;
-  let barpos1 = 0;
-  let barpos2 = 0;
+  let barWidth = canvas.width / B2P1;
   let barHeight;
   let mag = 0;
-  let x = 1;
+  let x = 0;
   for (let i = 0; i < B2P1; i++) {
     mag = DFT_Series[DFT_Series_pos][i];
     barHeight = -canvas.height + map(mag, 0, 255, 0, canvas.height);
     canvasCtx.fillStyle = grayscale[mag];
-
-    let y1 = Math.log10(x);
-    let y2 = Math.log10(B2P1 - x);
-    barpos2 = (y1 / y2) * canvas.width;
-    canvasCtx.fillRect(barpos1, canvas.height, barpos2, barHeight);
-    barpos1 = barpos2;
-    //x += barWidth;
+    canvasCtx.fillRect(x, canvas.height, barWidth, barHeight);
+    x += barWidth;
   }
   canvasCtx.strokeRect(0, 0, canvas.width, canvas.height);
 
@@ -155,8 +165,8 @@ const draw = function() {
   context_fftSeries.fillStyle = '#FFF';
   context_fftSeries.fillRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
 
-  const rectHeight = canvas_fftSeries.height / B2P1;
-  const rectWidth = canvas_fftSeries.width / FRAMESIZE;
+  let rectHeight = canvas_fftSeries.height / B2P1;
+  let rectWidth = canvas_fftSeries.width / FRAMESIZE;
   let xpos = 0;
   let ypos;
   for (let xidx = DFT_Series_pos + 1; xidx <= DFT_Series_pos + FRAMESIZE; xidx++) {
@@ -174,6 +184,29 @@ const draw = function() {
     xpos += rectWidth;
   }
   context_fftSeries.strokeRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
+
+  // Draw mel spectrum
+  context_fftSeries_mel.fillStyle = '#FFF';
+  context_fftSeries_mel.fillRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
+
+  rectHeight = canvas_fftSeries_mel.height / nMelFilter;
+  rectWidth = canvas_fftSeries_mel.width / FRAMESIZE;
+  xpos = 0;
+  for (let xidx = DFT_Series_pos + 1; xidx <= DFT_Series_pos + FRAMESIZE; xidx++) {
+    ypos = canvas_fftSeries_mel.height;
+    for (let yidx = 0; yidx < nMelFilter; yidx++) {
+      mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
+      if (mag != 0) {
+        context_fftSeries_mel.fillStyle = grayscale[Math.floor(map(mag, 0, 10, 255, 0))];
+        context_fftSeries_mel.fillRect(xpos, ypos, rectWidth, -rectHeight);
+      } else {
+        //
+      }
+      ypos -= rectHeight;
+    }
+    xpos += rectWidth;
+  }
+  context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
 }; // end draw fcn
 
 draw();

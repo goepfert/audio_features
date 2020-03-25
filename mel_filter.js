@@ -13,9 +13,9 @@ let mel_filter = function() {
   let _highMel;
   let _dMel;
 
-  let _m = [];  // mel filter points (equally spaced in mel space)
-  let _h = [];  // filter points in frequency domain
-  let _f = [];  // map _h to nearest FT bin
+  let _m = []; // mel filter points (equally spaced in mel space)
+  let _h = []; // filter points in frequency domain
+  let _f = []; // map _h to nearest FT bin
   let _Hm = []; // 2d array [index frequency domain][mel filter id] -> mel filter id [0, ..., _nMel-1]
 
   function init(samplerate, nfft, lowFreq, highFreq, nMel) {
@@ -52,7 +52,6 @@ let mel_filter = function() {
   }
 
   function createFilterbanks() {
-
     for (let m = 1; m <= _nMel; m++) {
       let H = [];
       for (let k = 0; k < _nfft / 2 + 1; k++) {
@@ -87,23 +86,35 @@ let mel_filter = function() {
   }
 
   function getMelCoefficient(mIdx, buffer) {
-    assert( _Hm[mIdx].length == buffer.length );
+    assert(_Hm[mIdx].length == buffer.length);
 
     let coeff = 0;
-    for(let idx=0; idx<buffer.length; idx++) {
+    for (let idx = 0; idx < buffer.length; idx++) {
       coeff += _Hm[mIdx][idx] * buffer[idx];
     }
     return coeff;
   }
 
   function getLogMelCoefficients(buffer) {
-    
     let melArray = [];
-    for(let mIdx=0; mIdx<_nMel; mIdx++) {
-      melArray.push( Math.log10(getMelCoefficient(mIdx, buffer)) );
+    for (let mIdx = 0; mIdx < _nMel; mIdx++) {
+      melArray.push(Math.log10(getMelCoefficient(mIdx, buffer)));
     }
 
     return melArray;
+  }
+
+  function getMelCoefficients(buffer) {
+    let melArray = [];
+    for (let mIdx = 0; mIdx < _nMel; mIdx++) {
+      melArray.push(getMelCoefficient(mIdx, buffer));
+    }
+
+    return melArray;
+  }
+
+  function setSamplerate(samplerate) {
+    _samplerate = samplerate;
   }
 
   function print() {
@@ -117,6 +128,8 @@ let mel_filter = function() {
     init: init,
     print: print,
     getFilterBank: getFilterBank,
-    getLogMelCoefficients: getLogMelCoefficients
+    getLogMelCoefficients: getLogMelCoefficients,
+    getMelCoefficients: getMelCoefficients,
+    setSamplerate: setSamplerate
   };
 };
