@@ -103,7 +103,7 @@ const handleSuccess = function(stream) {
       DFT_Series[DFT_Series_pos][idx] = mag;
     }
 
-    // Copy aaray of mel coefficients
+    // Copy array of mel coefficients
     //DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getMelCoefficients(dft.mag));
     DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getLogMelCoefficients(dft.mag, -1, 2));
   };
@@ -209,22 +209,70 @@ const draw = function() {
 
 draw();
 
+// Training Data
+let inputs_class1 = [];
+let inputs_class2 = [];
+
+let inputs = [
+  {
+    label: 'class1',
+    data: []
+  },
+  {
+    label: 'class2',
+    data: []
+  },
+  {
+    label: 'class3',
+    data: []
+  }
+];
+
 // take a snapshot on click
 const RECORDTIME = 1000; //ms
 const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
 assert(buffertime > RECORDTIME);
 
-let startFrame = 0;
-let endFrame = 0;
-const record_btn = document.getElementById('record');
-record_btn.addEventListener('click', () => {
-  startFrame = DFT_Series_pos;
-  setTimeout(() => {
-    record();
-  }, RECORDTIME);
-});
-
-function record() {
-  endFrame = DFT_Series_pos;
-  console.log(startFrame, endFrame);
+/**
+ * Get collection of Record Buttons and assign record fcn to each click
+ */
+let record_btns = document.getElementsByClassName('record_btn');
+console.log(record_btns);
+for (let idx = 0; idx < record_btns.length; idx++) {
+  record_btns[idx].addEventListener('click', () => {
+    startFrame = DFT_Series_pos;
+    setTimeout(() => {
+      record(record_btns[idx].id);
+    }, RECORDTIME);
+  });
 }
+
+/**
+ * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
+ */
+function record(label) {
+  console.log(label);
+
+  let endFrame = DFT_Series_pos;
+  console.log(startFrame, endFrame);
+
+  let image = [];
+  let curpos = startFrame;
+  for (let idx = 0; idx < FRAMESIZE; idx++) {
+    //image.push([...DFT_Series_mel[curpos]]);
+    image[idx] = Array.from(DFT_Series_mel[curpos]);
+    curpos++;
+    if (curpos >= FRAMESIZE) {
+      curpos = 0;
+    }
+    if (curpos == endFrame) {
+      continue;
+    }
+  }
+
+  inputs[inputs.findIndex(input => input.label == label)].data.push(image);
+}
+
+/**
+ *
+ */

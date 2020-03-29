@@ -12,10 +12,17 @@
     <canvas id="oscilloscope"></canvas>
     <canvas id="fft-series"></canvas>
     <canvas id="fft-series mel"></canvas>
-    <button id="record">Record</button>
+
+    <div class="button">
+      <button class="record_btn" id="class1">Record Class1</button>
+      <button class="record_btn" id="class2">Record Class2</button>
+      <button class="record_btn" id="class3">Record Class3</button>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
+
     <script src="utils.js"></script>
     <script src="myFFT.js"></script>
     <script src="mel_filter.js"></script>
