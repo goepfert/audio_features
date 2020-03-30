@@ -4,24 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style.css" />
-    <title>Microphone Demo</title>
+    <title>TensorFlow</title>
   </head>
   <body>
-    <h1>Microphone Demo</h1>
+    <h1>TensorFlow</h1>
 
-    <canvas id="oscilloscope"></canvas>
-    <canvas id="fft-series"></canvas>
-    <canvas id="fft-series mel"></canvas>
-
-    <div class="button">
-      <button class="record_btn" id="class1">Record Class1</button>
-      <button class="record_btn" id="class2">Record Class2</button>
-      <button class="record_btn" id="class3">Record Class3</button>
-    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js"></script>
+    <!-- Import TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
+    <!-- Import tfjs-vis -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.0.2/dist/tfjs-vis.umd.min.js"></script>
 
     <script src="ml.js"></script>
   </body>
