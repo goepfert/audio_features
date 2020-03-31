@@ -1,11 +1,9 @@
 /**
  * dummy cnn
+ * some ressources:
+ * https://blog.tensorflow.org/2018/04/a-gentle-introduction-to-tensorflowjs.html
+ * https://codelabs.developers.google.com/codelabs/tfjs-training-classfication/index.html?index=..%2F..index#5
  */
-
-const SIZEX = 100; // nFrames
-const SIZEY = 100; // nMelfilter
-const NDATA = 100;
-const BATCH_SIZE = 10;
 
 // create some dummy data values
 let inputs = [
@@ -22,6 +20,12 @@ let inputs = [
     data: []
   }
 ];
+
+const SIZEX = 32; // nFrames
+const SIZEY = 32; // nMelfilter
+const NDATA = 100;
+const DATASIZE = NDATA * inputs.length;
+const BATCH_SIZE = 20;
 
 let ys = [];
 let image = [];
@@ -89,7 +93,7 @@ function createData() {
 
   function getXs() {
     let xs = tf.tensor3d(_xData);
-    //xs.reshape([TRAIN_DATA_SIZE, 28, 28, 1] ???
+    xs = xs.reshape([DATASIZE, SIZEX, SIZEY, 1]);
     return xs;
   }
 
@@ -125,7 +129,7 @@ function createModel() {
     tf.layers.conv2d({
       inputShape: [IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS],
       dataFormat: 'channelsLast',
-      kernelSize: 5,
+      kernelSize: 4,
       filters: 8,
       strides: 1,
       activation: 'relu',
@@ -141,7 +145,7 @@ function createModel() {
   // Note that we have more filters in the convolution.
   model.add(
     tf.layers.conv2d({
-      kernelSize: 5,
+      kernelSize: 4,
       filters: 16,
       strides: 1,
       activation: 'relu',
@@ -155,7 +159,16 @@ function createModel() {
   // higher dimensional data to a final classification output layer.
   model.add(tf.layers.flatten());
 
-  //model.add(tf.layers.dropout({rate: 0.25}));
+  model.add(tf.layers.dropout({ rate: 0.25 }));
+
+  model.add(
+    tf.layers.dense({
+      units: 200,
+      activation: 'relu'
+    })
+  );
+
+  model.add(tf.layers.dropout({ rate: 0.5 }));
 
   // Our last layer is a dense layer which has 10 output units, one for each
   // output class (i.e. 0, 1, 2, 3, 4, 5, 6, 7, 8, 9).
@@ -192,6 +205,7 @@ async function train(model, data) {
     batchSize: BATCH_SIZE,
     epochs: 10,
     shuffle: true,
+    validationSplit: 0.2,
     callbacks: fitCallbacks
   });
 }
@@ -200,5 +214,67 @@ async function train(model, data) {
 const model = createModel();
 tfvis.show.modelSummary({ name: 'Model Summary' }, model);
 
-//const data = createData();
-//train(model, data);
+/**
+ * Button Event Listeners to start training and to test some dummy data
+ */
+document.getElementById('train_btn').addEventListener('click', () => {
+  const data = createData();
+
+  console.log('start training ...');
+  train(model, data).then(() => {
+    console.log('training finished');
+  });
+});
+
+// Test Data
+document.getElementById('test_btn1').addEventListener('click', () => {
+
+  let image = [];
+  
+  // Class1
+  for (let idx = 0; idx < SIZEX; idx++) {
+    ys = Array.from(Array(SIZEY), () => Math.floor(Math.random() * 33));
+    image.push(ys);
+  };
+
+  let x = tf.tensor2d(image).reshape([1,SIZEX, SIZEY,1]);
+
+  console.log('start testing1 ...');
+  model.predict(x).print();
+  
+});
+
+document.getElementById('test_btn2').addEventListener('click', () => {
+
+  let image = [];
+  
+  // Class1
+  for (let idx = 0; idx < SIZEX; idx++) {
+    ys = Array.from(Array(SIZEY), () => Math.floor(Math.random() * 33 + 33));
+    image.push(ys);
+  };
+
+  let x = tf.tensor2d(image).reshape([1,SIZEX, SIZEY,1]);
+
+  console.log('start testing2 ...');
+  model.predict(x).print();
+  
+});
+
+document.getElementById('test_btn3').addEventListener('click', () => {
+
+  let image = [];
+  
+  // Class1
+  for (let idx = 0; idx < SIZEX; idx++) {
+    ys = Array.from(Array(SIZEY), () => Math.floor(Math.random() * 33 + 66));
+    image.push(ys);
+  };
+
+  let x = tf.tensor2d(image).reshape([1,SIZEX, SIZEY,1]);
+
+  console.log('start testing3 ...');
+  model.predict(x).print();
+  
+})
+
