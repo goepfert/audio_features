@@ -1,5 +1,6 @@
 const context = new AudioContext();
 
+// canvas wisth and height
 const w = 500;
 const h = 250;
 
@@ -201,18 +202,15 @@ const draw = function() {
   }
   context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
 
-  // wait some time to get other things done
+  // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 20);
+  }, 100);
 }; // end draw fcn
 
 draw();
 
 // Training Data
-let inputs_class1 = [];
-let inputs_class2 = [];
-
 let inputs = [
   {
     label: 'class1',
@@ -230,7 +228,9 @@ let inputs = [
 
 // take a snapshot on click
 const RECORDTIME = 1000; //ms
+const RECORDBUFFER = Math.floor(((samplerate / 1000) * RECORDTIME) / BUFFERSIZE + 1); // nBuffer of Size Recordbuffer
 const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
+
 assert(buffertime > RECORDTIME);
 
 /**
@@ -243,7 +243,7 @@ for (let idx = 0; idx < record_btns.length; idx++) {
     startFrame = DFT_Series_pos;
     setTimeout(() => {
       record(record_btns[idx].id);
-    }, RECORDTIME);
+    }, RECORDTIME); //Fuck ... not always the same length (but always larger :))
   });
 }
 
@@ -251,11 +251,9 @@ for (let idx = 0; idx < record_btns.length; idx++) {
  * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
  */
 function record(label) {
-  console.log(label);
-
-  let endFrame = DFT_Series_pos;
-  console.log(startFrame, endFrame);
-
+  console.log('record:', label);
+  //let endFrame = DFT_Series_pos;
+  let endFrame = (startFrame + RECORDBUFFER) % FRAMESIZE;
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < FRAMESIZE; idx++) {
@@ -266,13 +264,69 @@ function record(label) {
       curpos = 0;
     }
     if (curpos == endFrame) {
-      continue;
+      break;
     }
   }
 
   inputs[inputs.findIndex(input => input.label == label)].data.push(image);
+  console.log(image.length, image[0].length, RECORDBUFFER);
+}
+
+/**
+ * convert data to tensors
+ */
+function createData() {
+  let _labelList = [];
+  let _xData = [];
+  let _yData = [];
+  let _dataSize = 0;
+
+  function createLabelList() {
+    let nLabels = inputs.length;
+    for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
+      _labelList.push(inputs[dataIdx].label);
+    }
+  }
+
+  (function convertData() {
+    console.log('constructor');
+
+    createLabelList();
+
+    let nLabels = inputs.length;
+    _xData = [];
+    _yData = [];
+    for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
+      for (let idx = 0; idx < inputs[dataIdx].data.length; idx++) {
+        _xData.push(inputs[dataIdx].data[idx]);
+        _yData.push(_labelList.indexOf(inputs[dataIdx].label));
+        _dataSize++;
+      }
+    }
+  })();
+
+  function getXs() {
+    let xs = tf.tensor3d(_xData);
+    xs = xs.reshape([_dataSize, RECORDBUFFER, nMelFilter, 1]);
+    return xs;
+  }
+
+  function getYs() {
+    let labelstensor = tf.tensor1d(_yData, 'int32');
+    let ys = tf.oneHot(labelstensor, 3);
+    labelstensor.dispose();
+    return ys;
+  }
+
+  return {
+    xs: getXs,
+    ys: getYs
+  };
 }
 
 /**
  *
  */
+const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
+const model = nn.getModel();
+tfvis.show.modelSummary({ name: 'Model Summary' }, model);
