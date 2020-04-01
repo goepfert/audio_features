@@ -1,10 +1,10 @@
+// It all starts with a context
 const context = new AudioContext();
 
-// canvas wisth and height
+// Canvas width and height
 const w = 500;
 const h = 250;
 
-// Get a canvas defined with ID "oscilloscope"
 const canvas = document.getElementById('oscilloscope');
 canvas.width = w;
 canvas.height = h;
@@ -21,8 +21,7 @@ canvas_fftSeries_mel.width = w;
 canvas_fftSeries_mel.height = h;
 
 // FT Stuff
-// 48 kHz sampling rate, 1024 samples => 21.3 ms
-const BUFFERSIZE = 512;
+const BUFFERSIZE = 512; // 48 kHz sampling rate, 1024 samples => 21.3 ms
 const B2P1 = BUFFERSIZE / 2 + 1;
 const dft = new DFT(BUFFERSIZE);
 let timeDomainData = [];
@@ -44,14 +43,6 @@ for (let idx = 0; idx < FRAMESIZE; idx++) {
 
   let mel_array = Array.from(Array(nMelFilter), () => 0);
   DFT_Series_mel.push(mel_array);
-}
-
-// Color maps css style
-const grayscale = [];
-const rainbow = [];
-for (let idx = 0; idx < 256; idx++) {
-  grayscale[idx] = `rgb(${idx}, ${idx}, ${idx})`;
-  rainbow[idx] = `hsl(${idx},100%,50%)`;
 }
 
 /**
@@ -93,13 +84,8 @@ const handleSuccess = function(stream) {
     let mag = 0;
     for (let idx = 0; idx < B2P1; idx++) {
       mag = dft.mag[idx];
-      mag = mag < min_val ? min_val : mag;
-      mag = mag > max_val ? max_val : mag;
-
-      mag = Math.log10(mag);
-      mag += min_val_exp;
-
-      mag = map(mag, 0, min_val_exp + max_val_exp, 255, 0);
+      mag = utils.logRangeMap(mag, min_val, max_val, min_val_exp, max_val_exp, 255, 0);
+      mag = utils.logRangeMap2(mag, min_val, max_val, min_val_exp, max_val_exp, 255, 0);
       mag = Math.round(mag);
       DFT_Series[DFT_Series_pos][idx] = mag;
     }
@@ -133,8 +119,8 @@ const draw = function() {
   let x = 0;
   for (let i = 0; i < B2P1; i++) {
     mag = DFT_Series[DFT_Series_pos][i];
-    barHeight = -canvas.height + map(mag, 0, 255, 0, canvas.height);
-    canvasCtx.fillStyle = rainbow[mag];
+    barHeight = -canvas.height + utils.map(mag, 0, 255, 0, canvas.height);
+    canvasCtx.fillStyle = utils.rainbow[mag];
     canvasCtx.fillRect(x, canvas.height, barWidth, barHeight);
     x += barWidth;
   }
@@ -172,7 +158,7 @@ const draw = function() {
     for (let yidx = 0; yidx < B2P1; yidx++) {
       mag = DFT_Series[xidx % FRAMESIZE][yidx];
       if (mag != 0) {
-        context_fftSeries.fillStyle = rainbow[mag];
+        context_fftSeries.fillStyle = utils.rainbow[mag];
         context_fftSeries.fillRect(xpos, ypos, rectWidth, -rectHeight);
       } else {
         //
@@ -194,7 +180,7 @@ const draw = function() {
     ypos = canvas_fftSeries_mel.height;
     for (let yidx = 0; yidx < nMelFilter; yidx++) {
       mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
-      context_fftSeries_mel.fillStyle = rainbow[mag];
+      context_fftSeries_mel.fillStyle = utils.rainbow[mag];
       context_fftSeries_mel.fillRect(xpos, ypos, rectWidth, -rectHeight);
       ypos -= rectHeight;
     }
@@ -205,7 +191,7 @@ const draw = function() {
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 100);
+  }, 20);
 }; // end draw fcn
 
 draw();
@@ -231,7 +217,7 @@ const RECORDTIME = 1000; //ms
 const RECORDBUFFER = Math.floor(((samplerate / 1000) * RECORDTIME) / BUFFERSIZE + 1); // nBuffer of Size Recordbuffer
 const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
 
-assert(buffertime > RECORDTIME);
+utils.assert(buffertime > RECORDTIME);
 
 /**
  * Get collection of Record Buttons and assign record fcn to each click

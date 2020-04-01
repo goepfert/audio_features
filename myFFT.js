@@ -1,6 +1,7 @@
 /**
  * Real Discrete Fourier Transform
  * https://www.analog.com/en/education/education-library/scientist_engineers_guide.html
+ * don't forget the 'this dot' ...
  */
 
 class DFT {
@@ -59,7 +60,7 @@ class DFT {
   }
 
   forward(buffer) {
-    assert(buffer.length == this.timeDomainSize);
+    utils.assert(buffer.length == this.timeDomainSize);
 
     // correlate input signal with each basis function
     let rval = 0;
@@ -85,7 +86,7 @@ class DFT {
    *
    */
   inverse(buffer) {
-    assert(buffer.length == this.timeDomainSize);
+    utils.assert(buffer.length == this.timeDomainSize);
 
     this.rectangularTransform();
 

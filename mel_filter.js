@@ -86,7 +86,7 @@ let mel_filter = function() {
   }
 
   function getMelCoefficient(mIdx, buffer) {
-    assert(_Hm[mIdx].length == buffer.length);
+    utils.assert(_Hm[mIdx].length == buffer.length);
 
     let coeff = 0;
     for (let idx = 0; idx < buffer.length; idx++) {
@@ -101,7 +101,7 @@ let mel_filter = function() {
       let m = Math.log10(getMelCoefficient(mIdx, buffer));
       m = m < min ? min : m;
       m = m > max ? max : m;
-      m = map(m, min, max, 255, 0);
+      m = utils.map(m, min, max, 255, 0);
       melArray.push(Math.round(m));
     }
 
