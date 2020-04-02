@@ -2,7 +2,7 @@
  * Collection of some usefull functions
  */
 
-const utils = (function() {
+const utils = (function () {
   const _grayscale = [];
   const _rainbow = [];
 
@@ -15,6 +15,12 @@ const utils = (function() {
     return ((value - x1) * (y2 - x2)) / (y1 - x1) + x2;
   }
 
+  function constrain(value, min, max) {
+    value = value < min ? min : value;
+    value = value > max ? max : value;
+    return value;
+  }
+
   function assert(condition, message) {
     if (!condition) {
       message = message || 'Assertion failed';
@@ -25,14 +31,10 @@ const utils = (function() {
     }
   }
 
-  function logRangeMap(val, min_lin, max_lin, min_exp, max_exp, map_x1, map_x2) {
-    // val = val < min_lin ? min_lin : val;
-    // val = val > max_lin ? max_lin : val;
+  function logRangeMap(val, min_exp, max_exp, map_x1, map_x2) {
     val = Math.log10(val);
-    // val = val < min_exp ? min_exp : val;
-    // val = val > max_exp ? max_exp : val;
-    val += min_exp;
-    val = map(val, 0, min_exp + max_exp, map_x1, map_x2);
+    val = constrain(val, min_exp, max_exp);
+    val = map(val, min_exp, max_exp, map_x1, map_x2);
 
     return val;
   }
@@ -52,6 +54,7 @@ const utils = (function() {
     grayscale: _grayscale,
     rainbow: _rainbow,
     map: map,
+    constrain: constrain,
     assert: assert,
     logRangeMap: logRangeMap,
     decibelsToLinear: decibelsToLinear,

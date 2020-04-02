@@ -8,9 +8,9 @@ fft.forward(data);
 console.log('data', data);
 fft.print();
 
-for (let i = 0; i <= 12; i++) {
-  let val = i * 10;
-  console.log(val, map(val, 0, 100, 0, 255));
+for (let i = -10; i <= 10; i++) {
+  let newval = utils.constrain(i, -5, 5);
+  console.log(i, utils.map(i, -5, 5, 0, 255), newval, utils.map(newval, -5, 5, 0, 255));
 }
 
 // Training Data

@@ -70,29 +70,19 @@ const handleSuccess = function(stream) {
       DFT_Series_pos = 0;
     }
 
-    // now it gets a little messy ...
-    // range of dft.mag: [0, about 100]
-    // define min value: e.g. 0.01 => min value exp = 2 (10^{-2})
-    // 1. map mag in range [min value, 100]
-    // 2. log10 -> range [-min value exp, 2]
-    // 3. shift by +(min value exp) -> range [0, 2 + min value exp], in this example [0, 4]
-    // 4. map values to [0, 255]
-    const min_val = 0.1;
-    const min_val_exp = Math.abs(Math.log10(min_val));
-    const max_val = 100;
-    const max_val_exp = Math.log10(max_val);
+    // Mapping for log scale
+    const min_exp = -1; // 10^{min_exp} linear
+    const max_exp = 2; // 10^{max_exp} linear
     let mag = 0;
     for (let idx = 0; idx < B2P1; idx++) {
       mag = dft.mag[idx];
-      mag = utils.logRangeMap(mag, min_val, max_val, min_val_exp, max_val_exp, 255, 0);
-      mag = utils.logRangeMap2(mag, min_val, max_val, min_val_exp, max_val_exp, 255, 0);
+      mag = utils.logRangeMap(mag, min_exp, max_exp, 255, 0);
       mag = Math.round(mag);
       DFT_Series[DFT_Series_pos][idx] = mag;
     }
 
     // Copy array of mel coefficients
-    //DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getMelCoefficients(dft.mag));
-    DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getLogMelCoefficients(dft.mag, -1, 2));
+    DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
   };
 };
 
@@ -191,7 +181,7 @@ const draw = function() {
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 20);
+  }, 50);
 }; // end draw fcn
 
 draw();
@@ -223,28 +213,39 @@ utils.assert(buffertime > RECORDTIME);
  * Get collection of Record Buttons and assign record fcn to each click
  */
 let record_btns = document.getElementsByClassName('record_btn');
-console.log(record_btns);
+//console.log(record_btns);
 for (let idx = 0; idx < record_btns.length; idx++) {
-  record_btns[idx].addEventListener('click', () => {
+  record_btns[idx].addEventListener('click', (e) => {
+    toggleButtons(true);
+    let label = record_btns[idx].id
+    console.log('record:', label);
     startFrame = DFT_Series_pos;
     setTimeout(() => {
-      record(record_btns[idx].id);
+      record(e, label);
     }, RECORDTIME); //Fuck ... not always the same length (but always larger :))
+    
   });
+}
+
+function toggleButtons(flag) {
+  for (let idx = 0; idx < record_btns.length; idx++) {
+    record_btns[idx].disabled = flag;
+  }
 }
 
 /**
  * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
  */
-function record(label) {
-  console.log('record:', label);
+function record(e, label) {
   //let endFrame = DFT_Series_pos;
   let endFrame = (startFrame + RECORDBUFFER) % FRAMESIZE;
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < FRAMESIZE; idx++) {
     //image.push([...DFT_Series_mel[curpos]]);
-    image[idx] = Array.from(DFT_Series_mel[curpos]);
+    image[idx] = (DFT_Series_mel[curpos]).map((m)=>{
+      return utils.map(m,0,255,1,0);
+    });
     curpos++;
     if (curpos >= FRAMESIZE) {
       curpos = 0;
@@ -254,8 +255,16 @@ function record(label) {
     }
   }
 
-  inputs[inputs.findIndex(input => input.label == label)].data.push(image);
-  console.log(image.length, image[0].length, RECORDBUFFER);
+  let index = inputs.findIndex(input => input.label == label);
+
+  inputs[index].data.push(image);
+  e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
+  console.log('recording finished');
+
+
+
+  toggleButtons(false);
+  //console.log(image.length, image[0].length, RECORDBUFFER);
 }
 
 /**
@@ -316,3 +325,10 @@ function createData() {
 const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
 const model = nn.getModel();
 tfvis.show.modelSummary({ name: 'Model Summary' }, model);
+
+const train_btn = document.getElementById('train_btn');
+train_btn.addEventListener('click', async () => {
+  const data = createData();
+  await nn.train(data.xs(), data.ys(), model);
+  console.log('training finished');
+})

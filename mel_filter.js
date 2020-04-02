@@ -98,11 +98,10 @@ let mel_filter = function() {
   function getLogMelCoefficients(buffer, min, max) {
     let melArray = [];
     for (let mIdx = 0; mIdx < _nMel; mIdx++) {
-      let m = Math.log10(getMelCoefficient(mIdx, buffer));
-      m = m < min ? min : m;
-      m = m > max ? max : m;
-      m = utils.map(m, min, max, 255, 0);
-      melArray.push(Math.round(m));
+      let m = getMelCoefficient(mIdx, buffer);
+      m = utils.logRangeMap(m, min, max, 255, 0);
+      m = Math.round(m);
+      melArray.push(m);
     }
 
     return melArray;

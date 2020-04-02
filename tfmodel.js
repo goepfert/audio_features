@@ -41,11 +41,11 @@ function createNetwork(width, height, nClasses) {
     model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
-        units: 200,
+        units: 100,
         activation: 'relu'
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.5 }));
+    model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
         units: NUM_OUTPUT_CLASSES,
@@ -65,7 +65,7 @@ function createNetwork(width, height, nClasses) {
   }
 
   async function train(xs, ys, model) {
-    const BATCH_SIZE = 20;
+    const BATCH_SIZE = 10;
     const metrics = ['loss', 'val_loss', 'acc', 'val_acc'];
     const container = {
       name: 'Model Training',
@@ -75,7 +75,7 @@ function createNetwork(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 10,
+      epochs: 40,
       shuffle: true,
       validationSplit: 0.2,
       callbacks: fitCallbacks
