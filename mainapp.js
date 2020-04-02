@@ -2,8 +2,8 @@
 const context = new AudioContext();
 
 // Canvas width and height
-const w = 500;
-const h = 250;
+const w = 400;
+const h = 200;
 
 const canvas = document.getElementById('oscilloscope');
 canvas.width = w;
@@ -199,6 +199,10 @@ let inputs = [
   {
     label: 'class3',
     data: []
+  },
+  {
+    label: 'class4',
+    data: []
   }
 ];
 
@@ -210,41 +214,54 @@ const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
 utils.assert(buffertime > RECORDTIME);
 
 /**
- * Get collection of Record Buttons and assign record fcn to each click
+ * Get collection of buttons
  */
-let record_btns = document.getElementsByClassName('record_btn');
+const record_btns = document.getElementsByClassName('record_btn');
+const train_btn = document.getElementById('train_btn');
+const predict_btn = document.getElementById('predict_btn');
+toggleButtons(false);
+
 //console.log(record_btns);
 for (let idx = 0; idx < record_btns.length; idx++) {
-  record_btns[idx].addEventListener('click', (e) => {
+  record_btns[idx].addEventListener('click', e => {
     toggleButtons(true);
-    let label = record_btns[idx].id
+    let label = record_btns[idx].id;
     console.log('record:', label);
-    startFrame = DFT_Series_pos;
+    //startFrame = DFT_Series_pos;
     setTimeout(() => {
-      record(e, label);
+      record(e, DFT_Series_pos, label);
     }, RECORDTIME); //Fuck ... not always the same length (but always larger :))
-    
   });
 }
 
-function toggleButtons(flag) {
+function toggleRecordButtons(flag) {
   for (let idx = 0; idx < record_btns.length; idx++) {
     record_btns[idx].disabled = flag;
   }
 }
 
+function togglePredictButton(flag) {
+  predict_btn.disabled = flag;
+}
+togglePredictButton(false);
+
+function toggleButtons(flag) {
+  toggleRecordButtons(flag);
+  train_btn.disabled = flag;
+}
+
 /**
  * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
  */
-function record(e, label) {
+function record(e, startFrame, label) {
   //let endFrame = DFT_Series_pos;
   let endFrame = (startFrame + RECORDBUFFER) % FRAMESIZE;
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < FRAMESIZE; idx++) {
     //image.push([...DFT_Series_mel[curpos]]);
-    image[idx] = (DFT_Series_mel[curpos]).map((m)=>{
-      return utils.map(m,0,255,1,0);
+    image[idx] = DFT_Series_mel[curpos].map(m => {
+      return utils.map(m, 0, 255, 1, 0);
     });
     curpos++;
     if (curpos >= FRAMESIZE) {
@@ -256,15 +273,10 @@ function record(e, label) {
   }
 
   let index = inputs.findIndex(input => input.label == label);
-
   inputs[index].data.push(image);
   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
   console.log('recording finished');
-
-
-
   toggleButtons(false);
-  //console.log(image.length, image[0].length, RECORDBUFFER);
 }
 
 /**
@@ -308,7 +320,7 @@ function createData() {
 
   function getYs() {
     let labelstensor = tf.tensor1d(_yData, 'int32');
-    let ys = tf.oneHot(labelstensor, 3);
+    let ys = tf.oneHot(labelstensor, inputs.length);
     labelstensor.dispose();
     return ys;
   }
@@ -320,15 +332,78 @@ function createData() {
 }
 
 /**
- *
+ * Create Network and attach training to training button
  */
 const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
 const model = nn.getModel();
 tfvis.show.modelSummary({ name: 'Model Summary' }, model);
 
-const train_btn = document.getElementById('train_btn');
 train_btn.addEventListener('click', async () => {
+  toggleButtons(true);
   const data = createData();
   await nn.train(data.xs(), data.ys(), model);
   console.log('training finished');
-})
+  togglePredictButton(false);
+});
+
+/**
+ * Predict section
+ */
+function predict(startFrame) {
+  let endFrame = (startFrame + RECORDBUFFER) % FRAMESIZE;
+  let image = [];
+  let curpos = startFrame;
+  for (let idx = 0; idx < FRAMESIZE; idx++) {
+    image[idx] = DFT_Series_mel[curpos].map(m => {
+      return utils.map(m, 0, 255, 1, 0);
+    });
+    curpos++;
+    if (curpos >= FRAMESIZE) {
+      curpos = 0;
+    }
+    if (curpos == endFrame) {
+      break;
+    }
+  }
+
+  let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
+  console.log('start testing3 ...');
+  model
+    .predict(x)
+    .data()
+    .then(result => {
+      console.log(result);
+      showPrediction(result);
+      x.dispose();
+    })
+    .catch(err => {
+      console.log(err);
+    });
+}
+
+function showPrediction(result) {
+  utils.assert(result.length == inputs.length);
+
+  const maxIdx = utils.indexOfMax(result);
+  let list = document.getElementById('result');
+  list.innerHTML = '';
+
+  for (let idx = 0; idx < result.length; idx++) {
+    let entry = document.createElement('li');
+    let span = document.createElement('span');
+    let textNode = document.createTextNode(`${inputs[idx].label}: ${result[idx]}`);
+    if (idx == maxIdx) {
+      span.style.color = 'red';
+    }
+    span.appendChild(textNode);
+    entry.appendChild(span);
+    list.appendChild(entry);
+  }
+}
+
+predict_btn.addEventListener('click', () => {
+  const INTERVALL = 500; //predict every 200ms
+  setInterval(() => {
+    predict(DFT_Series_pos);
+  }, INTERVALL);
+});

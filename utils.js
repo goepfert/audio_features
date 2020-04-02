@@ -2,7 +2,7 @@
  * Collection of some usefull functions
  */
 
-const utils = (function () {
+const utils = (function() {
   const _grayscale = [];
   const _rainbow = [];
 
@@ -39,6 +39,24 @@ const utils = (function () {
     return val;
   }
 
+  function indexOfMax(arr) {
+    if (arr.length === 0) {
+      return -1;
+    }
+
+    var max = arr[0];
+    var maxIndex = 0;
+
+    for (var i = 1; i < arr.length; i++) {
+      if (arr[i] > max) {
+        maxIndex = i;
+        max = arr[i];
+      }
+    }
+
+    return maxIndex;
+  }
+
   function decibelsToLinear(decibels) {
     return Math.pow(10, 0.05 * decibels);
   }
@@ -57,6 +75,7 @@ const utils = (function () {
     constrain: constrain,
     assert: assert,
     logRangeMap: logRangeMap,
+    indexOfMax: indexOfMax,
     decibelsToLinear: decibelsToLinear,
     linearToDecibels: linearToDecibels
   };
