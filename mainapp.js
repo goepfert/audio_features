@@ -1,25 +1,6 @@
 // It all starts with a context
 const context = new AudioContext();
 
-// Canvas width and height
-const w = 400;
-const h = 200;
-
-const canvas = document.getElementById('oscilloscope');
-canvas.width = w;
-canvas.height = h;
-const canvasCtx = canvas.getContext('2d');
-
-const canvas_fftSeries = document.getElementById('fft-series');
-const context_fftSeries = canvas_fftSeries.getContext('2d');
-canvas_fftSeries.width = w;
-canvas_fftSeries.height = h;
-
-const canvas_fftSeries_mel = document.getElementById('fft-series mel');
-const context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
-canvas_fftSeries_mel.width = w;
-canvas_fftSeries_mel.height = h;
-
 // FT Stuff
 const BUFFERSIZE = 512; // 48 kHz sampling rate, 1024 samples => 21.3 ms
 const B2P1 = BUFFERSIZE / 2 + 1;
@@ -31,10 +12,12 @@ const nMelFilter = 26; // Number of Mel Filterbanks
 let DFT_Series = []; // ringbuffer
 let DFT_Series_mel = []; // ringbuffer
 let DFT_Series_pos = FRAMESIZE - 1; // head of ringbuffer
+let STARTFRAME;
+let ENDFRAME;
 
 const filter = mel_filter();
 const samplerate = context.sampleRate;
-filter.init(samplerate, BUFFERSIZE, 0, samplerate / 2, nMelFilter);
+filter.init(samplerate, BUFFERSIZE, 300, 4000, nMelFilter);
 
 // Prefill arrays
 for (let idx = 0; idx < FRAMESIZE; idx++) {
@@ -45,10 +28,29 @@ for (let idx = 0; idx < FRAMESIZE; idx++) {
   DFT_Series_mel.push(mel_array);
 }
 
+// Canvas width and height
+const w = 4 * FRAMESIZE;
+const h = 4 * nMelFilter;
+
+const canvas = document.getElementById('oscilloscope');
+canvas.width = w;
+canvas.height = B2P1;
+const canvasCtx = canvas.getContext('2d');
+
+const canvas_fftSeries = document.getElementById('fft-series');
+const context_fftSeries = canvas_fftSeries.getContext('2d');
+canvas_fftSeries.width = w;
+canvas_fftSeries.height = B2P1;
+
+const canvas_fftSeries_mel = document.getElementById('fft-series mel');
+const context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
+canvas_fftSeries_mel.width = w;
+canvas_fftSeries_mel.height = h;
+
 /**
  * Handle mic data
  */
-const handleSuccess = function(stream) {
+const handleSuccess = function (stream) {
   console.log('handle success');
   const source = context.createMediaStreamSource(stream);
 
@@ -57,7 +59,7 @@ const handleSuccess = function(stream) {
   source.connect(processor);
   processor.connect(context.destination);
 
-  processor.onaudioprocess = function(e) {
+  processor.onaudioprocess = function (e) {
     const inputBuffer = e.inputBuffer;
     timeDomainData = inputBuffer.getChannelData(0);
 
@@ -83,6 +85,14 @@ const handleSuccess = function(stream) {
 
     // Copy array of mel coefficients
     DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
+
+    if(STARTFRAME == DFT_Series_pos) {
+      STARTFRAME = undefined;
+    }
+    if(ENDFRAME == DFT_Series_pos) {
+      ENDFRAME = undefined;
+    }
+
   };
 };
 
@@ -98,7 +108,7 @@ navigator.mediaDevices
  * Recursive draw function
  * Called as fast as possible by the browser (as far as I understood)
  */
-const draw = function() {
+const draw = function () {
   canvasCtx.fillStyle = '#FFF';
   canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -170,12 +180,18 @@ const draw = function() {
     ypos = canvas_fftSeries_mel.height;
     for (let yidx = 0; yidx < nMelFilter; yidx++) {
       mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
-      context_fftSeries_mel.fillStyle = utils.rainbow[mag];
+      if((xidx % FRAMESIZE == STARTFRAME) || (xidx % FRAMESIZE == ENDFRAME) ) {
+        context_fftSeries_mel.fillStyle = '#800000';
+      } else {
+        context_fftSeries_mel.fillStyle = utils.rainbow[mag];
+      }
       context_fftSeries_mel.fillRect(xpos, ypos, rectWidth, -rectHeight);
       ypos -= rectHeight;
     }
     xpos += rectWidth;
+
   }
+
   context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
 
   // draw asap ... but wait some time to get other things done
@@ -195,15 +211,17 @@ let inputs = [
   {
     label: 'class2',
     data: []
-  },
+  }
+  ,
   {
     label: 'class3',
     data: []
-  },
-  {
-    label: 'class4',
-    data: []
   }
+  // ,
+  // {
+  //   label: 'class4',
+  //   data: []
+  // }
 ];
 
 // take a snapshot on click
@@ -219,6 +237,7 @@ utils.assert(buffertime > RECORDTIME);
 const record_btns = document.getElementsByClassName('record_btn');
 const train_btn = document.getElementById('train_btn');
 const predict_btn = document.getElementById('predict_btn');
+const showImages_btn = document.getElementById('showImages_btn');
 toggleButtons(false);
 
 //console.log(record_btns);
@@ -227,9 +246,10 @@ for (let idx = 0; idx < record_btns.length; idx++) {
     toggleButtons(true);
     let label = record_btns[idx].id;
     console.log('record:', label);
-    //startFrame = DFT_Series_pos;
+    STARTFRAME = DFT_Series_pos;
+    ENDFRAME = undefined;
     setTimeout(() => {
-      record(e, DFT_Series_pos, label);
+      record(e, label);
     }, RECORDTIME); //Fuck ... not always the same length (but always larger :))
   });
 }
@@ -247,17 +267,18 @@ togglePredictButton(false);
 
 function toggleButtons(flag) {
   toggleRecordButtons(flag);
+  showImages_btn.disabled = flag;
   train_btn.disabled = flag;
 }
 
 /**
  * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
  */
-function record(e, startFrame, label) {
+function record(e, label) {
   //let endFrame = DFT_Series_pos;
-  let endFrame = (startFrame + RECORDBUFFER) % FRAMESIZE;
+  ENDFRAME = (STARTFRAME + RECORDBUFFER) % FRAMESIZE;
   let image = [];
-  let curpos = startFrame;
+  let curpos = STARTFRAME;
   for (let idx = 0; idx < FRAMESIZE; idx++) {
     //image.push([...DFT_Series_mel[curpos]]);
     image[idx] = DFT_Series_mel[curpos].map(m => {
@@ -267,7 +288,7 @@ function record(e, startFrame, label) {
     if (curpos >= FRAMESIZE) {
       curpos = 0;
     }
-    if (curpos == endFrame) {
+    if (curpos == ENDFRAME) {
       break;
     }
   }
@@ -372,9 +393,9 @@ function predict(startFrame) {
     .predict(x)
     .data()
     .then(result => {
-      console.log(result);
+      //console.log(result);
       showPrediction(result);
-      x.dispose();
+      x.dispose(); // Even with this I see mem leaking
     })
     .catch(err => {
       console.log(err);
@@ -385,13 +406,14 @@ function showPrediction(result) {
   utils.assert(result.length == inputs.length);
 
   const maxIdx = utils.indexOfMax(result);
+
   let list = document.getElementById('result');
   list.innerHTML = '';
 
   for (let idx = 0; idx < result.length; idx++) {
     let entry = document.createElement('li');
     let span = document.createElement('span');
-    let textNode = document.createTextNode(`${inputs[idx].label}: ${result[idx]}`);
+    let textNode = document.createTextNode(`${inputs[idx].label}: ${result[idx].toFixed(2)}`);
     if (idx == maxIdx) {
       span.style.color = 'red';
     }
@@ -399,11 +421,55 @@ function showPrediction(result) {
     entry.appendChild(span);
     list.appendChild(entry);
   }
+
+  //
+  const TRESHOLD = 0.80;
+  let div = document.getElementById('topresult');
+  div.innerHTML = '';
+  let entry = document.createElement('p');
+  let span = document.createElement('span');
+  let textNode;
+  if (result[maxIdx] > TRESHOLD) {
+    textNode = document.createTextNode(`${inputs[maxIdx].label}`);
+  } else {
+    textNode = document.createTextNode('unknown');
+  }
+  span.appendChild(textNode);
+  entry.appendChild(span);
+  div.appendChild(entry);
+
 }
 
 predict_btn.addEventListener('click', () => {
-  const INTERVALL = 500; //predict every 200ms
+  const INTERVALL = 330; //predict every XXX ms
   setInterval(() => {
     predict(DFT_Series_pos);
   }, INTERVALL);
+});
+
+// who understands what is happening here, feel free to explain it to me :)
+function transpose(a) {
+  return a[0].map((_, c) => a.map(r => utils.map(r[c], 0, 1, 255, 0)));
+}
+
+showImages_btn.addEventListener('click', async () => {
+  const surface = tfvis.visor().surface({
+    name: 'Recorded Images',
+    tab: 'Input Data'
+  });
+  const drawArea = surface.drawArea; // Get the examples
+  drawArea.innerHTML = '';
+  for (let classIdx = 0; classIdx < inputs.length; classIdx++) {
+    const p = document.createElement('p');
+    p.innerText = inputs[classIdx].label;
+    drawArea.appendChild(p);
+    for (let idx = 0; idx < inputs[classIdx].data.length; idx++) {
+      const canvas = document.createElement('canvas');
+      canvas.width = RECORDBUFFER + 2;
+      canvas.height = nMelFilter + 2;
+      canvas.style = 'margin: 1px; border: solid 1px';
+      await tf.browser.toPixels(transpose(inputs[classIdx].data[idx]).reverse(), canvas);
+      drawArea.appendChild(canvas);
+    }
+  }
 });
