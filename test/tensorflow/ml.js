@@ -228,53 +228,46 @@ document.getElementById('train_btn').addEventListener('click', () => {
 
 // Test Data
 document.getElementById('test_btn1').addEventListener('click', () => {
-
   let image = [];
-  
+
   // Class1
   for (let idx = 0; idx < SIZEX; idx++) {
     ys = Array.from(Array(SIZEY), () => Math.floor(Math.random() * 33));
     image.push(ys);
-  };
+  }
 
-  let x = tf.tensor2d(image).reshape([1,SIZEX, SIZEY,1]);
+  let x = tf.tensor2d(image).reshape([1, SIZEX, SIZEY, 1]);
 
   console.log('start testing1 ...');
   model.predict(x).print();
-  
 });
 
 document.getElementById('test_btn2').addEventListener('click', () => {
-
   let image = [];
-  
+
   // Class1
   for (let idx = 0; idx < SIZEX; idx++) {
     ys = Array.from(Array(SIZEY), () => Math.floor(Math.random() * 33 + 33));
     image.push(ys);
-  };
+  }
 
-  let x = tf.tensor2d(image).reshape([1,SIZEX, SIZEY,1]);
+  let x = tf.tensor2d(image).reshape([1, SIZEX, SIZEY, 1]);
 
   console.log('start testing2 ...');
   model.predict(x).print();
-  
 });
 
 document.getElementById('test_btn3').addEventListener('click', () => {
-
   let image = [];
-  
+
   // Class1
   for (let idx = 0; idx < SIZEX; idx++) {
     ys = Array.from(Array(SIZEY), () => Math.floor(Math.random() * 33 + 66));
     image.push(ys);
-  };
+  }
 
-  let x = tf.tensor2d(image).reshape([1,SIZEX, SIZEY,1]);
+  let x = tf.tensor2d(image).reshape([1, SIZEX, SIZEY, 1]);
 
   console.log('start testing3 ...');
   model.predict(x).print();
-  
-})
-
+});

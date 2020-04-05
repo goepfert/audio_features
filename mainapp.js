@@ -1,19 +1,22 @@
 // It all starts with a context
 const context = new AudioContext();
 
+// How many classes to classify (normally, the first class refers to the background)
+const NCLASSES = 3;
+
 // FT Stuff
-const BUFFERSIZE = 512; // 48 kHz sampling rate, 1024 samples => 21.3 ms
+const BUFFERSIZE = 256; // 48 kHz sampling rate, 1024 samples => 21.3 ms
 const B2P1 = BUFFERSIZE / 2 + 1;
 const dft = new DFT(BUFFERSIZE);
 let timeDomainData = [];
 
-const FRAMESIZE = 200; // How many frames of size BUFFERSIZE
+const FRAMESIZE = 220; // How many frames of size BUFFERSIZE
 const nMelFilter = 26; // Number of Mel Filterbanks
 let DFT_Series = []; // ringbuffer
 let DFT_Series_mel = []; // ringbuffer
 let DFT_Series_pos = FRAMESIZE - 1; // head of ringbuffer
-let STARTFRAME;
-let ENDFRAME;
+let STARTFRAME; // Recording
+let ENDFRAME; // Recording
 
 const filter = mel_filter();
 const samplerate = context.sampleRate;
@@ -73,7 +76,7 @@ const handleSuccess = function (stream) {
     }
 
     // Mapping for log scale
-    const min_exp = -1; // 10^{min_exp} linear
+    const min_exp = 0; // 10^{min_exp} linear
     const max_exp = 2; // 10^{max_exp} linear
     let mag = 0;
     for (let idx = 0; idx < B2P1; idx++) {
@@ -86,13 +89,13 @@ const handleSuccess = function (stream) {
     // Copy array of mel coefficients
     DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
 
-    if(STARTFRAME == DFT_Series_pos) {
+    // Clear frames
+    if (STARTFRAME == DFT_Series_pos) {
       STARTFRAME = undefined;
     }
-    if(ENDFRAME == DFT_Series_pos) {
+    if (ENDFRAME == DFT_Series_pos) {
       ENDFRAME = undefined;
     }
-
   };
 };
 
@@ -102,7 +105,7 @@ const handleSuccess = function (stream) {
 navigator.mediaDevices
   .getUserMedia({ audio: true, video: false })
   .then(handleSuccess)
-  .catch(err => console.log(err));
+  .catch((err) => console.log(err));
 
 /**
  * Recursive draw function
@@ -180,7 +183,7 @@ const draw = function () {
     ypos = canvas_fftSeries_mel.height;
     for (let yidx = 0; yidx < nMelFilter; yidx++) {
       mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
-      if((xidx % FRAMESIZE == STARTFRAME) || (xidx % FRAMESIZE == ENDFRAME) ) {
+      if (xidx % FRAMESIZE == STARTFRAME || xidx % FRAMESIZE == ENDFRAME) {
         context_fftSeries_mel.fillStyle = '#800000';
       } else {
         context_fftSeries_mel.fillStyle = utils.rainbow[mag];
@@ -189,7 +192,6 @@ const draw = function () {
       ypos -= rectHeight;
     }
     xpos += rectWidth;
-
   }
 
   context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
@@ -197,32 +199,30 @@ const draw = function () {
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 50);
+  }, 30);
 }; // end draw fcn
 
 draw();
 
-// Training Data
-let inputs = [
-  {
-    label: 'class1',
-    data: []
-  },
-  {
-    label: 'class2',
-    data: []
-  }
-  ,
-  {
-    label: 'class3',
-    data: []
-  }
-  // ,
-  // {
-  //   label: 'class4',
-  //   data: []
-  // }
-];
+// Create Training Data and record buttons
+let inputs = [];
+const record_btns_div = document.getElementById('record_btns');
+
+for (let idx = 0; idx < NCLASSES; idx++) {
+  inputs.push({
+    label: `class${idx + 1}`,
+    data: [],
+  });
+
+  const btn = document.createElement('button');
+  btn.classList.add('record_btn');
+  btn.id = `class${idx + 1}`;
+  btn.innerHTML = `Record class${idx + 1}`;
+  const label = document.createElement('label');
+  label.htmlFor = `class${idx + 1}`;
+  record_btns_div.appendChild(btn);
+  record_btns_div.appendChild(label);
+}
 
 // take a snapshot on click
 const RECORDTIME = 1000; //ms
@@ -240,9 +240,9 @@ const predict_btn = document.getElementById('predict_btn');
 const showImages_btn = document.getElementById('showImages_btn');
 toggleButtons(false);
 
-//console.log(record_btns);
+// Event listeners for record buttons
 for (let idx = 0; idx < record_btns.length; idx++) {
-  record_btns[idx].addEventListener('click', e => {
+  record_btns[idx].addEventListener('click', (e) => {
     toggleButtons(true);
     let label = record_btns[idx].id;
     console.log('record:', label);
@@ -281,8 +281,8 @@ function record(e, label) {
   let curpos = STARTFRAME;
   for (let idx = 0; idx < FRAMESIZE; idx++) {
     //image.push([...DFT_Series_mel[curpos]]);
-    image[idx] = DFT_Series_mel[curpos].map(m => {
-      return utils.map(m, 0, 255, 1, 0);
+    image[idx] = DFT_Series_mel[curpos].map((m) => {
+      return utils.map(m, 0, 255, 1, -1);
     });
     curpos++;
     if (curpos >= FRAMESIZE) {
@@ -293,7 +293,7 @@ function record(e, label) {
     }
   }
 
-  let index = inputs.findIndex(input => input.label == label);
+  let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
   console.log('recording finished');
@@ -348,19 +348,24 @@ function createData() {
 
   return {
     xs: getXs,
-    ys: getYs
+    ys: getYs,
   };
 }
 
 /**
  * Create Network and attach training to training button
  */
-const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
-const model = nn.getModel();
-tfvis.show.modelSummary({ name: 'Model Summary' }, model);
+let nn;
+let model;
+// const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
+// const model = nn.getModel();
+// tfvis.show.modelSummary({ name: 'Model Summary' }, model);
 
 train_btn.addEventListener('click', async () => {
   toggleButtons(true);
+  nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
+  model = nn.getModel();
+  tfvis.show.modelSummary({ name: 'Model Summary' }, model);
   const data = createData();
   await nn.train(data.xs(), data.ys(), model);
   console.log('training finished');
@@ -370,13 +375,17 @@ train_btn.addEventListener('click', async () => {
 /**
  * Predict section
  */
-function predict(startFrame) {
-  let endFrame = (startFrame + RECORDBUFFER) % FRAMESIZE;
+function predict(endFrame) {
+  //let startFrame = (endFrame - RECORDBUFFER) % FRAMESIZE;
+  let startFrame = (endFrame - RECORDBUFFER) % FRAMESIZE;
+  if (startFrame < 0) {
+    startFrame = FRAMESIZE + startFrame;
+  }
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < FRAMESIZE; idx++) {
-    image[idx] = DFT_Series_mel[curpos].map(m => {
-      return utils.map(m, 0, 255, 1, 0);
+    image[idx] = DFT_Series_mel[curpos].map((m) => {
+      return utils.map(m, 0, 255, 1, -1);
     });
     curpos++;
     if (curpos >= FRAMESIZE) {
@@ -388,16 +397,14 @@ function predict(startFrame) {
   }
 
   let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
-  console.log('start testing3 ...');
+
   model
     .predict(x)
     .data()
-    .then(result => {
-      //console.log(result);
+    .then((result) => {
       showPrediction(result);
-      x.dispose(); // Even with this I see mem leaking
     })
-    .catch(err => {
+    .catch((err) => {
       console.log(err);
     });
 }
@@ -423,47 +430,52 @@ function showPrediction(result) {
   }
 
   //
-  const TRESHOLD = 0.80;
-  let div = document.getElementById('topresult');
-  div.innerHTML = '';
-  let entry = document.createElement('p');
-  let span = document.createElement('span');
-  let textNode;
-  if (result[maxIdx] > TRESHOLD) {
-    textNode = document.createTextNode(`${inputs[maxIdx].label}`);
-  } else {
-    textNode = document.createTextNode('unknown');
+  const TRESHOLD = 0.9;
+  if (result[maxIdx] > TRESHOLD && maxIdx != 0) {
+    let div = document.getElementById('topresult');
+    div.innerHTML = '';
+    let entry = document.createElement('p');
+    let span = document.createElement('span');
+    let textNode;
+    textNode = document.createTextNode(
+      `last recognized class (threshold>${TRESHOLD}) except class1: ${inputs[maxIdx].label}`
+    );
+    span.appendChild(textNode);
+    entry.appendChild(span);
+    div.appendChild(entry);
   }
-  span.appendChild(textNode);
-  entry.appendChild(span);
-  div.appendChild(entry);
-
 }
 
 predict_btn.addEventListener('click', () => {
-  const INTERVALL = 330; //predict every XXX ms
+  const INTERVALL = 500; //predict every XXX ms
   setInterval(() => {
-    predict(DFT_Series_pos);
+    tf.tidy(() => {
+      predict(DFT_Series_pos);
+    });
   }, INTERVALL);
 });
 
 // who understands what is happening here, feel free to explain it to me :)
 function transpose(a) {
-  return a[0].map((_, c) => a.map(r => utils.map(r[c], 0, 1, 255, 0)));
+  return a[0].map((_, c) => a.map((r) => utils.map(r[c], -1, 1, 255, 0)));
 }
 
 showImages_btn.addEventListener('click', async () => {
   const surface = tfvis.visor().surface({
     name: 'Recorded Images',
-    tab: 'Input Data'
+    tab: 'Input Data',
   });
   const drawArea = surface.drawArea; // Get the examples
   drawArea.innerHTML = '';
+  const MAX = 20;
   for (let classIdx = 0; classIdx < inputs.length; classIdx++) {
     const p = document.createElement('p');
     p.innerText = inputs[classIdx].label;
     drawArea.appendChild(p);
     for (let idx = 0; idx < inputs[classIdx].data.length; idx++) {
+      if (idx >= MAX) {
+        break;
+      }
       const canvas = document.createElement('canvas');
       canvas.width = RECORDBUFFER + 2;
       canvas.height = nMelFilter + 2;
@@ -472,4 +484,14 @@ showImages_btn.addEventListener('click', async () => {
       drawArea.appendChild(canvas);
     }
   }
+});
+
+const save_btn = document.getElementById('save_btn');
+save_btn.addEventListener('click', () => {
+  Store.saveData(inputs, 'data');
+});
+
+const load_btn = document.getElementById('load_btn');
+load_btn.addEventListener('click', () => {
+  inputs = Store.getData('data');
 });
