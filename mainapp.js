@@ -66,6 +66,8 @@ const handleSuccess = function (stream) {
     const inputBuffer = e.inputBuffer;
     timeDomainData = inputBuffer.getChannelData(0);
 
+    //what about doing some loudness normalization before?
+
     // Do the Fourier Transformation
     dft.forward(timeDomainData);
 
@@ -495,3 +497,50 @@ const load_btn = document.getElementById('load_btn');
 load_btn.addEventListener('click', () => {
   inputs = Store.getData('data');
 });
+
+/**
+ * Accuracy and Confusion Matrix
+ */
+let classNames = [];
+
+for (let idx = 0; idx < inputs.length; idx++) {
+  classNames.push(inputs[idx].label);
+}
+
+function doPrediction() {
+  const data = createData();
+  const testxs = data.xs();
+  const labels = data.ys().argMax([-1]);
+  const preds = model.predict(testxs).argMax([-1]);
+  testxs.dispose();
+  return [preds, labels];
+}
+
+async function showAccuracy() {
+  const [preds, labels] = doPrediction();
+
+  const classAccuracy = await tfvis.metrics.perClassAccuracy(labels, preds);
+  const container = {
+    name: 'Accuracy',
+    tab: 'Evaluation',
+  };
+  tfvis.show.perClassAccuracy(container, classAccuracy, classNames);
+  labels.dispose();
+}
+
+async function showConfusion() {
+  const [preds, labels] = doPrediction();
+  const confusionMatrix = await tfvis.metrics.confusionMatrix(labels, preds);
+  const container = {
+    name: 'Confusion Matrix',
+    tab: 'Evaluation',
+  };
+  tfvis.render.confusionMatrix(container, {
+    values: confusionMatrix,
+    tickLabels: classNames,
+  });
+  labels.dispose();
+}
+
+document.querySelector('#show-accuracy').addEventListener('click', () => showAccuracy());
+document.querySelector('#show-confusion').addEventListener('click', () => showConfusion());
