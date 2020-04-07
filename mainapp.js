@@ -12,9 +12,10 @@ let timeDomainData = [];
 
 const FRAMESIZE = 220; // How many frames of size BUFFERSIZE
 const nMelFilter = 26; // Number of Mel Filterbanks
+let TIME_SERIES = [];
 let DFT_Series = []; // ringbuffer
 let DFT_Series_mel = []; // ringbuffer
-let DFT_Series_pos = FRAMESIZE - 1; // head of ringbuffer
+let SERIES_POS = FRAMESIZE - 1; // head of ringbuffer
 let STARTFRAME; // Recording
 let ENDFRAME; // Recording
 
@@ -24,6 +25,9 @@ filter.init(samplerate, BUFFERSIZE, 300, 4000, nMelFilter);
 
 // Prefill arrays
 for (let idx = 0; idx < FRAMESIZE; idx++) {
+  let time_array = Array.from(Array(BUFFERSIZE), () => 0);
+  TIME_SERIES.push(time_array);
+
   let ft_array = Array.from(Array(B2P1), () => 0);
   DFT_Series.push(ft_array);
 
@@ -66,36 +70,38 @@ const handleSuccess = function (stream) {
     const inputBuffer = e.inputBuffer;
     timeDomainData = inputBuffer.getChannelData(0);
 
+    // Shift head of ringbuffer
+    SERIES_POS++;
+    if (SERIES_POS > FRAMESIZE - 1) {
+      SERIES_POS = 0;
+    }
+
     //what about doing some loudness normalization before?
+    TIME_SERIES[SERIES_POS] = Array.from(timeDomainData);
 
     // Do the Fourier Transformation
     dft.forward(timeDomainData);
-
-    // Shift head of ringbuffer
-    DFT_Series_pos++;
-    if (DFT_Series_pos > FRAMESIZE - 1) {
-      DFT_Series_pos = 0;
-    }
 
     // Mapping for log scale
     const min_exp = 0; // 10^{min_exp} linear
     const max_exp = 2; // 10^{max_exp} linear
     let mag = 0;
+    utils.assert(B2P1 == dft.mag.length);
     for (let idx = 0; idx < B2P1; idx++) {
       mag = dft.mag[idx];
       mag = utils.logRangeMap(mag, min_exp, max_exp, 255, 0);
       mag = Math.round(mag);
-      DFT_Series[DFT_Series_pos][idx] = mag;
+      DFT_Series[SERIES_POS][idx] = mag;
     }
 
     // Copy array of mel coefficients
-    DFT_Series_mel[DFT_Series_pos] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
+    DFT_Series_mel[SERIES_POS] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
 
     // Clear frames
-    if (STARTFRAME == DFT_Series_pos) {
+    if (STARTFRAME == SERIES_POS) {
       STARTFRAME = undefined;
     }
-    if (ENDFRAME == DFT_Series_pos) {
+    if (ENDFRAME == SERIES_POS) {
       ENDFRAME = undefined;
     }
   };
@@ -123,7 +129,7 @@ const draw = function () {
   let mag = 0;
   let x = 0;
   for (let i = 0; i < B2P1; i++) {
-    mag = DFT_Series[DFT_Series_pos][i];
+    mag = DFT_Series[SERIES_POS][i];
     barHeight = -canvas.height + utils.map(mag, 0, 255, 0, canvas.height);
     canvasCtx.fillStyle = utils.rainbow[mag];
     canvasCtx.fillRect(x, canvas.height, barWidth, barHeight);
@@ -158,7 +164,7 @@ const draw = function () {
   let rectWidth = canvas_fftSeries.width / FRAMESIZE;
   let xpos = 0;
   let ypos;
-  for (let xidx = DFT_Series_pos + 1; xidx <= DFT_Series_pos + FRAMESIZE; xidx++) {
+  for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
     ypos = canvas_fftSeries.height;
     for (let yidx = 0; yidx < B2P1; yidx++) {
       mag = DFT_Series[xidx % FRAMESIZE][yidx];
@@ -181,7 +187,7 @@ const draw = function () {
   rectHeight = canvas_fftSeries_mel.height / nMelFilter;
   rectWidth = canvas_fftSeries_mel.width / FRAMESIZE;
   xpos = 0;
-  for (let xidx = DFT_Series_pos + 1; xidx <= DFT_Series_pos + FRAMESIZE; xidx++) {
+  for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
     ypos = canvas_fftSeries_mel.height;
     for (let yidx = 0; yidx < nMelFilter; yidx++) {
       mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
@@ -213,6 +219,7 @@ const record_btns_div = document.getElementById('record_btns');
 for (let idx = 0; idx < NCLASSES; idx++) {
   inputs.push({
     label: `class${idx + 1}`,
+    loudness: undefined,
     data: [],
   });
 
@@ -233,6 +240,7 @@ const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
 
 utils.assert(buffertime > RECORDTIME);
 
+
 /**
  * Get collection of buttons
  */
@@ -242,13 +250,52 @@ const predict_btn = document.getElementById('predict_btn');
 const showImages_btn = document.getElementById('showImages_btn');
 toggleButtons(false);
 
+
+/**
+ * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
+ */
+function record(e, label) {
+  //let endFrame = SERIES_POS;
+  ENDFRAME = (STARTFRAME + RECORDBUFFER) % FRAMESIZE;
+  let image = [];
+  let timeseries = [];
+  let curpos = STARTFRAME;
+  for (let idx = 0; idx < FRAMESIZE; idx++) {
+    //image.push([...DFT_Series_mel[curpos]]);
+
+    timeseries.push([...TIME_SERIES[curpos]]);
+    image[idx] = DFT_Series_mel[curpos].map((m) => {
+      return utils.map(m, 0, 255, 1, -1);
+    });
+    curpos++;
+    if (curpos >= FRAMESIZE) {
+      curpos = 0;
+    }
+    if (curpos == ENDFRAME) {
+      break;
+    }
+  }
+
+  //TODO: calculate loudness an time series between start and endframe
+  let loudness = calculateLoudness(timeseries);
+  //??
+
+  let index = inputs.findIndex((input) => input.label == label);
+  inputs[index].data.push(image);
+  inputs[index].loudness = loudness;
+  e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
+  console.log('recording finished');
+  toggleButtons(false);
+}
+
+
 // Event listeners for record buttons
 for (let idx = 0; idx < record_btns.length; idx++) {
   record_btns[idx].addEventListener('click', (e) => {
     toggleButtons(true);
     let label = record_btns[idx].id;
     console.log('record:', label);
-    STARTFRAME = DFT_Series_pos;
+    STARTFRAME = SERIES_POS;
     ENDFRAME = undefined;
     setTimeout(() => {
       record(e, label);
@@ -271,35 +318,6 @@ function toggleButtons(flag) {
   toggleRecordButtons(flag);
   showImages_btn.disabled = flag;
   train_btn.disabled = flag;
-}
-
-/**
- * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
- */
-function record(e, label) {
-  //let endFrame = DFT_Series_pos;
-  ENDFRAME = (STARTFRAME + RECORDBUFFER) % FRAMESIZE;
-  let image = [];
-  let curpos = STARTFRAME;
-  for (let idx = 0; idx < FRAMESIZE; idx++) {
-    //image.push([...DFT_Series_mel[curpos]]);
-    image[idx] = DFT_Series_mel[curpos].map((m) => {
-      return utils.map(m, 0, 255, 1, -1);
-    });
-    curpos++;
-    if (curpos >= FRAMESIZE) {
-      curpos = 0;
-    }
-    if (curpos == ENDFRAME) {
-      break;
-    }
-  }
-
-  let index = inputs.findIndex((input) => input.label == label);
-  inputs[index].data.push(image);
-  e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
-  console.log('recording finished');
-  toggleButtons(false);
 }
 
 /**
@@ -384,8 +402,10 @@ function predict(endFrame) {
     startFrame = FRAMESIZE + startFrame;
   }
   let image = [];
+  let timeseries = [];
   let curpos = startFrame;
   for (let idx = 0; idx < FRAMESIZE; idx++) {
+    timeseries.push([...TIME_SERIES[curpos]]);
     image[idx] = DFT_Series_mel[curpos].map((m) => {
       return utils.map(m, 0, 255, 1, -1);
     });
@@ -397,6 +417,9 @@ function predict(endFrame) {
       break;
     }
   }
+
+  let loudness = calculateLoudness(timeseries);
+  TODO: ....
 
   let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
 
@@ -452,7 +475,7 @@ predict_btn.addEventListener('click', () => {
   const INTERVALL = 500; //predict every XXX ms
   setInterval(() => {
     tf.tidy(() => {
-      predict(DFT_Series_pos);
+      predict(SERIES_POS);
     });
   }, INTERVALL);
 });
