@@ -54,6 +54,10 @@ const context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
 canvas_fftSeries_mel.width = w;
 canvas_fftSeries_mel.height = h;
 
+// Loudness
+const loudnessSample = new LoudnessSample(samplerate);
+const targetLKFS = -13;
+
 /**
  * Handle mic data
  */
@@ -220,6 +224,7 @@ for (let idx = 0; idx < NCLASSES; idx++) {
   inputs.push({
     label: `class${idx + 1}`,
     loudness: undefined,
+    targetGain: undefined,
     data: [],
   });
 
@@ -240,7 +245,6 @@ const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
 
 utils.assert(buffertime > RECORDTIME);
 
-
 /**
  * Get collection of buttons
  */
@@ -249,7 +253,6 @@ const train_btn = document.getElementById('train_btn');
 const predict_btn = document.getElementById('predict_btn');
 const showImages_btn = document.getElementById('showImages_btn');
 toggleButtons(false);
-
 
 /**
  * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
@@ -276,18 +279,20 @@ function record(e, label) {
     }
   }
 
-  //TODO: calculate loudness an time series between start and endframe
-  let loudness = calculateLoudness(timeseries);
-  //??
+  //calculate loudness an time series between start and endframe
+  let loudness = loudnessSample.calculateLoudness([].concat.apply([], timeseries));
+  let dB = loudness - targetLKFS;
+  let targetGain = 1 / Math.pow(10, dB / 20);
+  console.log(loudness, targetGain);
 
   let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
   inputs[index].loudness = loudness;
+  inputs[index].targetGain = targetGain;
   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
   console.log('recording finished');
   toggleButtons(false);
 }
-
 
 // Event listeners for record buttons
 for (let idx = 0; idx < record_btns.length; idx++) {
@@ -419,7 +424,7 @@ function predict(endFrame) {
   }
 
   let loudness = calculateLoudness(timeseries);
-  TODO: ....
+  //TODO: map image with loudness
 
   let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
 
