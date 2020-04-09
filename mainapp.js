@@ -223,9 +223,11 @@ const record_btns_div = document.getElementById('record_btns');
 for (let idx = 0; idx < NCLASSES; idx++) {
   inputs.push({
     label: `class${idx + 1}`,
-    loudness: undefined,
-    targetGain: undefined,
-    data: [],
+    loudness: undefined,      // not needed
+    targetGain: undefined,    // not needed
+    timeseries: [],           // needed for post loudness calculation
+    data_loudnessadopted: [], // the loudness scaled image
+    data: [],                 // the unscaled image
   });
 
   const btn = document.createElement('button');
@@ -287,6 +289,7 @@ function record(e, label) {
 
   let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
+  inputs[index].timeseries.push(timeseries);
   inputs[index].loudness = loudness;
   inputs[index].targetGain = targetGain;
   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
@@ -351,6 +354,31 @@ function createData() {
     _yData = [];
     for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
       for (let idx = 0; idx < inputs[dataIdx].data.length; idx++) {
+
+        // post loudness calculation
+        let loudness = loudnessSample.calculateLoudness([].concat.apply([], inputs[dataIdx].timeseries));
+        // post DFT
+        for (let bufferIdx = 0; bufferIdx < inputs[dataIdx].timeseries.length; bufferIdx++) {
+
+          //TODO: scale timeseries
+
+          // Do the Fourier Transformation
+          dft.forward(inputs[dataIdx].timeseries[bufferIdx]);
+
+          // Mapping for log scale
+          // TODO: global consts
+          const min_exp = 0; // 10^{min_exp} linear
+          const max_exp = 2; // 10^{max_exp} linear
+          let mag = 0;
+          utils.assert(B2P1 == dft.mag.length);
+
+          // Copy array of mel coefficients
+          inputs[dataIdx].data_loudnessadopted = 
+          DFT_Series_mel[SERIES_POS] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
+
+        }
+
+
         _xData.push(inputs[dataIdx].data[idx]);
         _yData.push(_labelList.indexOf(inputs[dataIdx].label));
         _dataSize++;
