@@ -1,27 +1,31 @@
 // It all starts with a context
 const context = new AudioContext();
 
-// How many classes to classify (normally, the first class refers to the background)
-const NCLASSES = 3;
+const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
 
 // FT Stuff
 const BUFFERSIZE = 256; // 48 kHz sampling rate, 1024 samples => 21.3 ms
-const B2P1 = BUFFERSIZE / 2 + 1;
+const B2P1 = BUFFERSIZE / 2 + 1; // Length of frequency domain data
 const dft = new DFT(BUFFERSIZE);
 let timeDomainData = [];
+const MIN_EXP = -0.5; // 10^{min_exp} linear, log scale minimum
+const MAX_EXP = 2; // 10^{max_exp} linear, log scale max
 
 const FRAMESIZE = 220; // How many frames of size BUFFERSIZE
 const nMelFilter = 26; // Number of Mel Filterbanks
-let TIME_SERIES = [];
-let DFT_Series = []; // ringbuffer
-let DFT_Series_mel = []; // ringbuffer
+let TIME_SERIES = []; // time domain ringbuffer
+let DFT_Series = []; // ringbuffer (only used for drawing)
+let DFT_Series_mel = []; // ringbuffer (only used for drawing)
 let SERIES_POS = FRAMESIZE - 1; // head of ringbuffer
-let STARTFRAME; // Recording
-let ENDFRAME; // Recording
+let STARTFRAME; // Recording Startframe (used for drawing)
+let ENDFRAME; // Recording Endframe (used for drawing)
 
+// Mel Filter
 const filter = mel_filter();
+const MIN_FREQUENCY = 300; // lower end of first mel filter bank
+const MAX_FREQUENCY = 4000; // upper end of last mel filterbank
 const samplerate = context.sampleRate;
-filter.init(samplerate, BUFFERSIZE, 300, 4000, nMelFilter);
+filter.init(samplerate, BUFFERSIZE, MIN_FREQUENCY, MAX_FREQUENCY, nMelFilter);
 
 // Prefill arrays
 for (let idx = 0; idx < FRAMESIZE; idx++) {
@@ -56,7 +60,8 @@ canvas_fftSeries_mel.height = h;
 
 // Loudness
 const loudnessSample = new LoudnessSample(samplerate);
-const targetLKFS = -13;
+const targetLKFS = -13; // the target loudness
+const LKFS_THRESHOLD = -30; // don't scale if LKFS is below this threshold
 
 /**
  * Handle mic data
@@ -80,35 +85,32 @@ const handleSuccess = function (stream) {
       SERIES_POS = 0;
     }
 
-    //what about doing some loudness normalization before?
     TIME_SERIES[SERIES_POS] = Array.from(timeDomainData);
 
     // Do the Fourier Transformation
     dft.forward(timeDomainData);
 
     // Mapping for log scale
-    const min_exp = 0; // 10^{min_exp} linear
-    const max_exp = 2; // 10^{max_exp} linear
     let mag = 0;
-    utils.assert(B2P1 == dft.mag.length);
+    utils.assert(B2P1 == dft.mag.length, 'checking length of frequency domain data');
     for (let idx = 0; idx < B2P1; idx++) {
       mag = dft.mag[idx];
-      mag = utils.logRangeMap(mag, min_exp, max_exp, 255, 0);
+      mag = utils.logRangeMap(mag, MIN_EXP, MAX_EXP, 255, 0);
       mag = Math.round(mag);
       DFT_Series[SERIES_POS][idx] = mag;
     }
 
     // Copy array of mel coefficients
-    DFT_Series_mel[SERIES_POS] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
+    DFT_Series_mel[SERIES_POS] = Array.from(filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP));
 
-    // Clear frames
+    // Clear frames (for drawing start and end of vertical line when recording)
     if (STARTFRAME == SERIES_POS) {
       STARTFRAME = undefined;
     }
     if (ENDFRAME == SERIES_POS) {
       ENDFRAME = undefined;
     }
-  };
+  }; //end onprocess mic data
 };
 
 /** Kicks off Mic data handle function
@@ -122,6 +124,7 @@ navigator.mediaDevices
 /**
  * Recursive draw function
  * Called as fast as possible by the browser (as far as I understood)
+ * Why not making an IIFE ...
  */
 const draw = function () {
   canvasCtx.fillStyle = '#FFF';
@@ -217,17 +220,13 @@ const draw = function () {
 draw();
 
 // Create Training Data and record buttons
-let inputs = [];
+let inputs = []; // the recorded data
 const record_btns_div = document.getElementById('record_btns');
-
 for (let idx = 0; idx < NCLASSES; idx++) {
   inputs.push({
-    label: `class${idx + 1}`,
-    loudness: undefined,      // not needed
-    targetGain: undefined,    // not needed
-    timeseries: [],           // needed for post loudness calculation
-    data_loudnessadopted: [], // the loudness scaled image
-    data: [],                 // the unscaled image
+    label: `class${idx + 1}`, // class label
+    data_adapted: [], // the loudness scaled image (mel spectrum)
+    data: [], // the unscaled image (mel spectrum)
   });
 
   const btn = document.createElement('button');
@@ -244,8 +243,7 @@ for (let idx = 0; idx < NCLASSES; idx++) {
 const RECORDTIME = 1000; //ms
 const RECORDBUFFER = Math.floor(((samplerate / 1000) * RECORDTIME) / BUFFERSIZE + 1); // nBuffer of Size Recordbuffer
 const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
-
-utils.assert(buffertime > RECORDTIME);
+utils.assert(buffertime > RECORDTIME, 'buffertime too small for recordings');
 
 /**
  * Get collection of buttons
@@ -257,7 +255,12 @@ const showImages_btn = document.getElementById('showImages_btn');
 toggleButtons(false);
 
 /**
- * extract snapshot of RECORDTIME from ringbuffer, copy it and assign classification label
+ * extract snapshot of RECORDTIME from ringbuffer
+ * calculate loudness of snapshot
+ * scale timeseries with gain correction (to given loudness)
+ * apply dft on adated timeseries (-> hope this makes some sense to do it this way)
+ * image[] contains the 'raw' mel filter 2d array
+ * image_adapted[] contains the loudness normalized mel filter 2d array
  */
 function record(e, label) {
   //let endFrame = SERIES_POS;
@@ -281,21 +284,42 @@ function record(e, label) {
     }
   }
 
-  //calculate loudness an time series between start and endframe
+  // post loudness calculation
+  // calculate loudness an time series between start and endframe
   let loudness = loudnessSample.calculateLoudness([].concat.apply([], timeseries));
   let dB = loudness - targetLKFS;
-  let targetGain = 1 / Math.pow(10, dB / 20);
+  let targetGain = 1;
+  if (loudness > LKFS_THRESHOLD) {
+    targetGain = 1 / Math.pow(10, dB / 20);
+  }
   console.log(loudness, targetGain);
+
+  // post DFT
+  let image_adapted = [];
+  for (let idx = 0; idx < timeseries.length; idx++) {
+    //TODO: scale timeseries
+    let timeseries_adapted = timeseries[idx].map((ts) => targetGain * ts);
+
+    // Do the Fourier Transformation
+    dft.forward(timeseries_adapted);
+    utils.assert(B2P1 == dft.mag.length);
+
+    // Copy array of mel coefficients
+    let tmp = filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP);
+    image_adapted.push(
+      tmp.map((m) => {
+        return utils.map(m, 0, 255, 1, -1);
+      })
+    );
+  }
 
   let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
-  inputs[index].timeseries.push(timeseries);
-  inputs[index].loudness = loudness;
-  inputs[index].targetGain = targetGain;
+  inputs[index].data_adapted.push(image_adapted);
   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
   console.log('recording finished');
   toggleButtons(false);
-}
+} // end recording
 
 // Event listeners for record buttons
 for (let idx = 0; idx < record_btns.length; idx++) {
@@ -353,33 +377,8 @@ function createData() {
     _xData = [];
     _yData = [];
     for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
-      for (let idx = 0; idx < inputs[dataIdx].data.length; idx++) {
-
-        // post loudness calculation
-        let loudness = loudnessSample.calculateLoudness([].concat.apply([], inputs[dataIdx].timeseries));
-        // post DFT
-        for (let bufferIdx = 0; bufferIdx < inputs[dataIdx].timeseries.length; bufferIdx++) {
-
-          //TODO: scale timeseries
-
-          // Do the Fourier Transformation
-          dft.forward(inputs[dataIdx].timeseries[bufferIdx]);
-
-          // Mapping for log scale
-          // TODO: global consts
-          const min_exp = 0; // 10^{min_exp} linear
-          const max_exp = 2; // 10^{max_exp} linear
-          let mag = 0;
-          utils.assert(B2P1 == dft.mag.length);
-
-          // Copy array of mel coefficients
-          inputs[dataIdx].data_loudnessadopted = 
-          DFT_Series_mel[SERIES_POS] = Array.from(filter.getLogMelCoefficients(dft.mag, min_exp, max_exp));
-
-        }
-
-
-        _xData.push(inputs[dataIdx].data[idx]);
+      for (let idx = 0; idx < inputs[dataIdx].data_adapted.length; idx++) {
+        _xData.push(inputs[dataIdx].data_adapted[idx]);
         _yData.push(_labelList.indexOf(inputs[dataIdx].label));
         _dataSize++;
       }
@@ -451,10 +450,37 @@ function predict(endFrame) {
     }
   }
 
-  let loudness = calculateLoudness(timeseries);
-  //TODO: map image with loudness
+  // post loudness calculation
+  // calculate loudness an time series between start and endframe
+  let loudness = loudnessSample.calculateLoudness([].concat.apply([], timeseries));
+  let dB = loudness - targetLKFS;
+  let targetGain = 1;
+  if (loudness > LKFS_THRESHOLD) {
+    targetGain = 1 / Math.pow(10, dB / 20);
+  }
+  console.log(loudness, targetGain);
 
-  let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
+  // post DFT
+  let image_adapted = [];
+  for (let idx = 0; idx < timeseries.length; idx++) {
+    //TODO: scale timeseries
+    let timeseries_adapted = timeseries[idx].map((ts) => targetGain * ts);
+
+    // Do the Fourier Transformation
+    dft.forward(timeseries_adapted);
+    utils.assert(B2P1 == dft.mag.length);
+
+    // Copy array of mel coefficients
+    let tmp = filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP);
+    image_adapted.push(
+      tmp.map((m) => {
+        return utils.map(m, 0, 255, 1, -1);
+      })
+    );
+  }
+
+  //let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
+  let x = tf.tensor2d(image_adapted).reshape([1, RECORDBUFFER, nMelFilter, 1]);
 
   model
     .predict(x)
@@ -530,7 +556,7 @@ showImages_btn.addEventListener('click', async () => {
     const p = document.createElement('p');
     p.innerText = inputs[classIdx].label;
     drawArea.appendChild(p);
-    for (let idx = 0; idx < inputs[classIdx].data.length; idx++) {
+    for (let idx = 0; idx < inputs[classIdx].data_adapted.length; idx++) {
       if (idx >= MAX) {
         break;
       }
@@ -538,7 +564,7 @@ showImages_btn.addEventListener('click', async () => {
       canvas.width = RECORDBUFFER + 2;
       canvas.height = nMelFilter + 2;
       canvas.style = 'margin: 1px; border: solid 1px';
-      await tf.browser.toPixels(transpose(inputs[classIdx].data[idx]).reverse(), canvas);
+      await tf.browser.toPixels(transpose(inputs[classIdx].data_adapted[idx]).reverse(), canvas);
       drawArea.appendChild(canvas);
     }
   }
