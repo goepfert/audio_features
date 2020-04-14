@@ -2,7 +2,7 @@
  * Collection of some usefull functions
  */
 
-const utils = (function() {
+const utils = (function () {
   const _grayscale = [];
   const _rainbow = [];
 
@@ -77,6 +77,6 @@ const utils = (function() {
     logRangeMap: logRangeMap,
     indexOfMax: indexOfMax,
     decibelsToLinear: decibelsToLinear,
-    linearToDecibels: linearToDecibels
+    linearToDecibels: linearToDecibels,
   };
 })();

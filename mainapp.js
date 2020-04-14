@@ -1,14 +1,14 @@
 // It all starts with a context
 const context = new AudioContext();
 
-const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
+const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
 
 // FT Stuff
 const BUFFERSIZE = 256; // 48 kHz sampling rate, 1024 samples => 21.3 ms
 const B2P1 = BUFFERSIZE / 2 + 1; // Length of frequency domain data
 const dft = new DFT(BUFFERSIZE);
 let timeDomainData = [];
-const MIN_EXP = -0.5; // 10^{min_exp} linear, log scale minimum
+const MIN_EXP = 0; // 10^{min_exp} linear, log scale minimum
 const MAX_EXP = 2; // 10^{max_exp} linear, log scale max
 
 const FRAMESIZE = 220; // How many frames of size BUFFERSIZE
@@ -23,9 +23,14 @@ let ENDFRAME; // Recording Endframe (used for drawing)
 // Mel Filter
 const filter = mel_filter();
 const MIN_FREQUENCY = 300; // lower end of first mel filter bank
-const MAX_FREQUENCY = 4000; // upper end of last mel filterbank
+const MAX_FREQUENCY = 6000; // upper end of last mel filterbank
 const samplerate = context.sampleRate;
 filter.init(samplerate, BUFFERSIZE, MIN_FREQUENCY, MAX_FREQUENCY, nMelFilter);
+
+// Loudness
+const loudnessSample = new LoudnessSample(samplerate);
+const targetLKFS = -13; // the target loudness
+const LKFS_THRESHOLD = -25; // don't scale if LKFS is below this threshold
 
 // Prefill arrays
 for (let idx = 0; idx < FRAMESIZE; idx++) {
@@ -40,28 +45,38 @@ for (let idx = 0; idx < FRAMESIZE; idx++) {
 }
 
 // Canvas width and height
+let drawit = [false, false, true];
+
 const w = 4 * FRAMESIZE;
 const h = 4 * nMelFilter;
 
-const canvas = document.getElementById('oscilloscope');
-canvas.width = w;
-canvas.height = B2P1;
-const canvasCtx = canvas.getContext('2d');
+let canvas;
+let canvasCtx;
+let canvas_fftSeries;
+let context_fftSeries;
+let canvas_fftSeries_mel;
+let context_fftSeries_mel;
 
-const canvas_fftSeries = document.getElementById('fft-series');
-const context_fftSeries = canvas_fftSeries.getContext('2d');
-canvas_fftSeries.width = w;
-canvas_fftSeries.height = B2P1;
+if (drawit[0]) {
+  canvas = document.getElementById('oscilloscope');
+  canvasCtx = canvas.getContext('2d');
+  canvas.width = w;
+  canvas.height = B2P1;
+}
 
-const canvas_fftSeries_mel = document.getElementById('fft-series mel');
-const context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
-canvas_fftSeries_mel.width = w;
-canvas_fftSeries_mel.height = h;
+if (drawit[1]) {
+  canvas_fftSeries = document.getElementById('fft-series');
+  context_fftSeries = canvas_fftSeries.getContext('2d');
+  canvas_fftSeries.width = w;
+  canvas_fftSeries.height = B2P1;
+}
 
-// Loudness
-const loudnessSample = new LoudnessSample(samplerate);
-const targetLKFS = -13; // the target loudness
-const LKFS_THRESHOLD = -30; // don't scale if LKFS is below this threshold
+if (drawit[2]) {
+  canvas_fftSeries_mel = document.getElementById('fft-series mel');
+  context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
+  canvas_fftSeries_mel.width = w;
+  canvas_fftSeries_mel.height = h;
+}
 
 /**
  * Handle mic data
@@ -87,6 +102,7 @@ const handleSuccess = function (stream) {
 
     TIME_SERIES[SERIES_POS] = Array.from(timeDomainData);
 
+    // for illustration purpose !!!
     // Do the Fourier Transformation
     dft.forward(timeDomainData);
 
@@ -127,89 +143,96 @@ navigator.mediaDevices
  * Why not making an IIFE ...
  */
 const draw = function () {
-  canvasCtx.fillStyle = '#FFF';
-  canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-
   // Draw magnitudes
-  let barWidth = canvas.width / B2P1;
-  let barHeight;
-  let mag = 0;
-  let x = 0;
-  for (let i = 0; i < B2P1; i++) {
-    mag = DFT_Series[SERIES_POS][i];
-    barHeight = -canvas.height + utils.map(mag, 0, 255, 0, canvas.height);
-    canvasCtx.fillStyle = utils.rainbow[mag];
-    canvasCtx.fillRect(x, canvas.height, barWidth, barHeight);
-    x += barWidth;
-  }
-  canvasCtx.strokeRect(0, 0, canvas.width, canvas.height);
+  if (drawit[0]) {
+    canvasCtx.fillStyle = '#FFF';
+    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Draw time series on top
-  canvasCtx.beginPath();
-  canvasCtx.lineWidth = 2;
-  canvasCtx.strokeStyle = '#000099';
-  let sliceWidth = canvas.width / BUFFERSIZE;
-  x = 0;
-  for (let i = 0; i < BUFFERSIZE; i++) {
-    let v = timeDomainData[i] + 1;
-    let y = (v * canvas.height) / 2;
-    if (i === 0) {
-      canvasCtx.moveTo(x, y);
-    } else {
-      canvasCtx.lineTo(x, y);
+    let barWidth = canvas.width / B2P1;
+    let barHeight;
+    let mag = 0;
+    let x = 0;
+
+    for (let i = 0; i < B2P1; i++) {
+      mag = DFT_Series[SERIES_POS][i];
+      barHeight = -canvas.height + utils.map(mag, 0, 255, 0, canvas.height);
+      canvasCtx.fillStyle = utils.rainbow[mag];
+      canvasCtx.fillRect(x, canvas.height, barWidth, barHeight);
+      x += barWidth;
     }
-    x += sliceWidth;
+    canvasCtx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    // Draw time series on top
+    canvasCtx.beginPath();
+    canvasCtx.lineWidth = 2;
+    canvasCtx.strokeStyle = '#000099';
+    let sliceWidth = canvas.width / BUFFERSIZE;
+    x = 0;
+    for (let i = 0; i < BUFFERSIZE; i++) {
+      let v = timeDomainData[i] + 1;
+      let y = (v * canvas.height) / 2;
+      if (i === 0) {
+        canvasCtx.moveTo(x, y);
+      } else {
+        canvasCtx.lineTo(x, y);
+      }
+      x += sliceWidth;
+    }
+    //canvasCtx.lineTo(canvas.width, canvas.height / 2);
+    canvasCtx.stroke();
   }
-  //canvasCtx.lineTo(canvas.width, canvas.height / 2);
-  canvasCtx.stroke();
 
   // Draw FT Time Series
-  context_fftSeries.fillStyle = '#FFF';
-  context_fftSeries.fillRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
+  if (drawit[1]) {
+    context_fftSeries.fillStyle = '#FFF';
+    context_fftSeries.fillRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
 
-  let rectHeight = canvas_fftSeries.height / B2P1;
-  let rectWidth = canvas_fftSeries.width / FRAMESIZE;
-  let xpos = 0;
-  let ypos;
-  for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
-    ypos = canvas_fftSeries.height;
-    for (let yidx = 0; yidx < B2P1; yidx++) {
-      mag = DFT_Series[xidx % FRAMESIZE][yidx];
-      if (mag != 0) {
-        context_fftSeries.fillStyle = utils.rainbow[mag];
-        context_fftSeries.fillRect(xpos, ypos, rectWidth, -rectHeight);
-      } else {
-        //
+    let rectHeight = canvas_fftSeries.height / B2P1;
+    let rectWidth = canvas_fftSeries.width / FRAMESIZE;
+    let xpos = 0;
+    let ypos;
+    for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
+      ypos = canvas_fftSeries.height;
+      for (let yidx = 0; yidx < B2P1; yidx++) {
+        mag = DFT_Series[xidx % FRAMESIZE][yidx];
+        if (mag != 0) {
+          context_fftSeries.fillStyle = utils.rainbow[mag];
+          context_fftSeries.fillRect(xpos, ypos, rectWidth, -rectHeight);
+        } else {
+          //
+        }
+        ypos -= rectHeight;
       }
-      ypos -= rectHeight;
+      xpos += rectWidth;
     }
-    xpos += rectWidth;
+    context_fftSeries.strokeRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
   }
-  context_fftSeries.strokeRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
 
   // Draw mel spectrum
-  context_fftSeries_mel.fillStyle = '#FFF';
-  context_fftSeries_mel.fillRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
+  if (drawit[2]) {
+    context_fftSeries_mel.fillStyle = '#FFF';
+    context_fftSeries_mel.fillRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
 
-  rectHeight = canvas_fftSeries_mel.height / nMelFilter;
-  rectWidth = canvas_fftSeries_mel.width / FRAMESIZE;
-  xpos = 0;
-  for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
-    ypos = canvas_fftSeries_mel.height;
-    for (let yidx = 0; yidx < nMelFilter; yidx++) {
-      mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
-      if (xidx % FRAMESIZE == STARTFRAME || xidx % FRAMESIZE == ENDFRAME) {
-        context_fftSeries_mel.fillStyle = '#800000';
-      } else {
-        context_fftSeries_mel.fillStyle = utils.rainbow[mag];
+    rectHeight = canvas_fftSeries_mel.height / nMelFilter;
+    rectWidth = canvas_fftSeries_mel.width / FRAMESIZE;
+    let xpos = 0;
+    for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
+      ypos = canvas_fftSeries_mel.height;
+      for (let yidx = 0; yidx < nMelFilter; yidx++) {
+        mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
+        if (xidx % FRAMESIZE == STARTFRAME || xidx % FRAMESIZE == ENDFRAME) {
+          context_fftSeries_mel.fillStyle = '#800000';
+        } else {
+          context_fftSeries_mel.fillStyle = utils.rainbow[mag];
+        }
+        context_fftSeries_mel.fillRect(xpos, ypos, rectWidth, -rectHeight);
+        ypos -= rectHeight;
       }
-      context_fftSeries_mel.fillRect(xpos, ypos, rectWidth, -rectHeight);
-      ypos -= rectHeight;
+      xpos += rectWidth;
     }
-    xpos += rectWidth;
-  }
 
-  context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
+    context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
+  }
 
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
@@ -268,9 +291,8 @@ function record(e, label) {
   let image = [];
   let timeseries = [];
   let curpos = STARTFRAME;
-  for (let idx = 0; idx < FRAMESIZE; idx++) {
-    //image.push([...DFT_Series_mel[curpos]]);
 
+  for (let idx = 0; idx < FRAMESIZE; idx++) {
     timeseries.push([...TIME_SERIES[curpos]]);
     image[idx] = DFT_Series_mel[curpos].map((m) => {
       return utils.map(m, 0, 255, 1, -1);
@@ -290,7 +312,7 @@ function record(e, label) {
   let dB = loudness - targetLKFS;
   let targetGain = 1;
   if (loudness > LKFS_THRESHOLD) {
-    targetGain = 1 / Math.pow(10, dB / 20);
+    targetGain = 1 / utils.decibelsToLinear(dB);
   }
   console.log(loudness, targetGain);
 
@@ -368,9 +390,23 @@ function createData() {
     }
   }
 
-  (function convertData() {
-    console.log('constructor');
+  function shuffle(obj1, obj2) {
+    let index = obj1.length;
+    let rnd, tmp1, tmp2;
 
+    while (index) {
+      rnd = Math.floor(Math.random() * index);
+      index -= 1;
+      tmp1 = obj1[index];
+      tmp2 = obj2[index];
+      obj1[index] = obj1[rnd];
+      obj2[index] = obj2[rnd];
+      obj1[rnd] = tmp1;
+      obj2[rnd] = tmp2;
+    }
+  }
+
+  (function convertData() {
     createLabelList();
 
     let nLabels = inputs.length;
@@ -383,6 +419,8 @@ function createData() {
         _dataSize++;
       }
     }
+
+    shuffle(_xData, _yData);
   })();
 
   function getXs() {
@@ -463,7 +501,7 @@ function predict(endFrame) {
   // post DFT
   let image_adapted = [];
   for (let idx = 0; idx < timeseries.length; idx++) {
-    //TODO: scale timeseries
+    // scale to target loudness
     let timeseries_adapted = timeseries[idx].map((ts) => targetGain * ts);
 
     // Do the Fourier Transformation

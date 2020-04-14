@@ -94,14 +94,15 @@ function createNetwork(width, height, nClasses) {
       name: 'Model Training',
       styles: { height: '1000px' },
     };
-    const fitCallbacks = tfvis.show.fitCallbacks(container, metrics);
+    //const fitCallbacks = tfvis.show.fitCallbacks(container, metrics);
+    const onEpochEnd = tfvis.show.fitCallbacks(container, metrics);
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 40,
+      epochs: 30,
       shuffle: true,
       validationSplit: 0.2,
-      callbacks: fitCallbacks,
+      callbacks: onEpochEnd,
     });
   }
 
