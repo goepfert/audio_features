@@ -1,36 +1,60 @@
 // It all starts with a context
 const context = new AudioContext();
-
-const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
-
-// FT Stuff
-const BUFFERSIZE = 256; // 48 kHz sampling rate, 1024 samples => 21.3 ms
-const B2P1 = BUFFERSIZE / 2 + 1; // Length of frequency domain data
-const dft = new DFT(BUFFERSIZE);
-let timeDomainData = [];
-const MIN_EXP = 0; // 10^{min_exp} linear, log scale minimum
-const MAX_EXP = 2; // 10^{max_exp} linear, log scale max
-
-const FRAMESIZE = 220; // How many frames of size BUFFERSIZE
-const nMelFilter = 26; // Number of Mel Filterbanks
-let TIME_SERIES = []; // time domain ringbuffer
-let DFT_Series = []; // ringbuffer (only used for drawing)
-let DFT_Series_mel = []; // ringbuffer (only used for drawing)
-let SERIES_POS = FRAMESIZE - 1; // head of ringbuffer
-let STARTFRAME; // Recording Startframe (used for drawing)
-let ENDFRAME; // Recording Endframe (used for drawing)
-
-// Mel Filter
-const filter = mel_filter();
-const MIN_FREQUENCY = 300; // lower end of first mel filter bank
-const MAX_FREQUENCY = 6000; // upper end of last mel filterbank
 const samplerate = context.sampleRate;
-filter.init(samplerate, BUFFERSIZE, MIN_FREQUENCY, MAX_FREQUENCY, nMelFilter);
+
+// Buffer sizes
+const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the mic)
+const FRAME_SIZE = samplerate * 0.025; // Frame_time == 25 ms
+const FRAME_STRIDE = samplerate * 0.01; // Frame_stride == 10 ms (=> 15 ms overlap)
+const RECORD_SIZE = samplerate * 1.0; // 1 second for recording and prediction, shall be gt the FRAME_SIZE
+
+const N_FRAMES 
+
+
+// Ringbuffer
+const RB_SIZE = 2 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE
+const timeDomainData = Array.from(Array(RB_SIZE), () => 0);
+let HEAD_POS = 0; 
 
 // Loudness
 const loudnessSample = new LoudnessSample(samplerate);
 const targetLKFS = -13; // the target loudness
 const LKFS_THRESHOLD = -25; // don't scale if LKFS is below this threshold
+
+// Hamming Window
+const window = createWindowing(FRAME_SIZE);
+
+// DFT
+const dft = new DFT(FRAME_SIZE);
+const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
+
+// Mel Filter
+const N_MEL_FILTER = 24; // Number of Mel Filterbanks
+const filter = mel_filter();
+const MIN_FREQUENCY = 300; // lower end of first mel filter bank
+const MAX_FREQUENCY = 6000; // upper end of last mel filterbank
+filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
+
+// Neural Network
+const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
+let nn; // defined later
+let model;
+
+// Plotting
+let STARTFRAME; // Recording Startframe (used for drawing)
+let ENDFRAME; // Recording Endframe (used for drawing)
+
+// Other
+const MIN_EXP = -1; // 10^{min_exp} linear, log scale minimum
+const MAX_EXP = 2; // 10^{max_exp} linear, log scale max
+
+// old ??
+const FRAMESIZE = 220; // How many frames of size BUFFERSIZE
+let TIME_SERIES = []; // time domain ringbuffer
+let DFT_Series = []; // ringbuffer (only used for drawing)
+let DFT_Series_mel = []; // ringbuffer (only used for drawing)
+let SERIES_POS = FRAMESIZE - 1; // head of ringbuffer
+
 
 // Prefill arrays
 for (let idx = 0; idx < FRAMESIZE; idx++) {
@@ -445,8 +469,7 @@ function createData() {
 /**
  * Create Network and attach training to training button
  */
-let nn;
-let model;
+
 // const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
 // const model = nn.getModel();
 // tfvis.show.modelSummary({ name: 'Model Summary' }, model);

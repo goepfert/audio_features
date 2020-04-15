@@ -68,6 +68,21 @@ const utils = (function () {
     return 20 * Math.log10(linear);
   }
 
+  function getNumberOfFrames(total_size, frame_size, frame_stride) {
+    let number = 0;
+    // for (let idx = 0; idx < total_size; idx += frame_stride) {
+    //   if (idx + frame_size > total_size) {
+    //     number = idx;
+    //     break;
+    //   }
+    // }
+
+    // or
+    number = 1 + Math.floor((total_size - frame_size) / frame_stride);
+
+    return number;
+  }
+
   return {
     grayscale: _grayscale,
     rainbow: _rainbow,
@@ -78,5 +93,6 @@ const utils = (function () {
     indexOfMax: indexOfMax,
     decibelsToLinear: decibelsToLinear,
     linearToDecibels: linearToDecibels,
+    getNumberOfFrames: getNumberOfFrames,
   };
 })();

@@ -2,7 +2,7 @@
  * http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/
  */
 
-let mel_filter = function() {
+let mel_filter = function () {
   let _samplerate;
   let _nfft;
   let _lowFreq;
@@ -44,11 +44,11 @@ let mel_filter = function() {
   }
 
   function calculate_Fi() {
-    _h = _m.map(m => melToF(m));
+    _h = _m.map((m) => melToF(m));
   }
 
   function convertToFrequencyBins() {
-    _f = _h.map(m => Math.floor(((_nfft + 1) * m) / _samplerate));
+    _f = _h.map((m) => Math.floor(((_nfft + 1) * m) / _samplerate));
   }
 
   function createFilterbanks() {
@@ -116,10 +116,6 @@ let mel_filter = function() {
     return melArray;
   }
 
-  function setSamplerate(samplerate) {
-    _samplerate = samplerate;
-  }
-
   function print() {
     console.log(_m);
     console.log(_h);
@@ -133,6 +129,5 @@ let mel_filter = function() {
     getFilterBank: getFilterBank,
     getLogMelCoefficients: getLogMelCoefficients,
     getMelCoefficients: getMelCoefficients,
-    setSamplerate: setSamplerate
   };
 };

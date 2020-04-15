@@ -1,23 +1,27 @@
-function createHamming(length) {
+/**
+ * number found around the web
+ * can be generalized for other windowing functions
+ */
+
+function createWindowing(length) {
   const _LENGTH = length;
-  const _WEIGHTS = [];
+  const _WEIGHTS_HAMMING_WINDOW = [];
 
   (function init() {
     for (let idx = 0; idx < _LENGTH; idx++) {
-      _WEIGHTS[idx] = 0.54 - 0.45 * Math.cos((2 * Math.PI * idx) / (_LENGTH - 1));
+      _WEIGHTS_HAMMING_WINDOW[idx] = 0.54 - 0.45 * Math.cos((2 * Math.PI * idx) / (_LENGTH - 1));
     }
   })();
 
-  function windowing(buffer) {
-    utils.assert(_LENGTH == buffer.length, 'window sizes do not match');
+  function hamming(buffer) {
+    utils.assert(_LENGTH == buffer.length, 'buffer sizes for windowing do not match');
 
     for (let idx = 0; idx < _LENGTH; idx++) {
-      buffer[idx] = buffer[idx] * _WEIGHTS[idx];
+      buffer[idx] = buffer[idx] * _WEIGHTS_HAMMING_WINDOW[idx];
     }
   }
 
   return {
-    w: _WEIGHTS,
-    windowing: windowing,
+    hamming: hamming,
   };
 }
