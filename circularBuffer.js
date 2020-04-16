@@ -1,20 +1,17 @@
 /**
- * Circular Ringbuffer for AudioBuffers
+ * Circular Buffer
  *
  * Custom made, not a general purpose ringbuffer
  * Construct with given length, concat buffer with a length that is an integer fraction of that length
- * Use getLength, getMyChannelData and getIndex to work with elements of that ringbuffer
- * Since it it used for loudness calculation, it saves the sqares and not only the values
+ * Use getLength, getData and getIndex to work with elements of that ringbuffer
  *
  * author: Thomas Goepfert
  */
 
-class CircularAudioBuffer {
-  constructor(context, nChannels, length, sampleRate) {
-    this.myAudioBuffer = context.createBuffer(nChannels, length, sampleRate);
-    this.nChannels = nChannels;
+class CircularBuffer {
+  constructor(length) {
+    this.myBuffer = Array.from(Array(length), () => 0);
     this.length = length;
-    this.sampleRate = sampleRate;
     this.head = 0;
     this.isFull = false;
   }
@@ -27,36 +24,26 @@ class CircularAudioBuffer {
   }
 
   /**
-   * inspired by https://github.com/audiojs/is-audio-buffer
+   *
    */
-  isAudioBuffer(buffer) {
+  isBuffer(buffer) {
     return (
       buffer != null &&
-      typeof buffer.length === 'number' &&
-      typeof buffer.sampleRate === 'number' &&
-      typeof buffer.getChannelData === 'function' &&
-      typeof buffer.duration === 'number' &&
-      buffer.numberOfChannels === this.nChannels &&
-      buffer.sampleRate === this.sampleRate &&
       this.length % buffer.length === 0 && // fromBuffer.length must be integer fraction of myAudioBuffer.length
       this.length - this.head >= buffer.length
     ); // still fits?
   }
 
   /**
-   * Copy data from fromBuffer to myAudioBuffer at head position
+   * Copy data from fromBuffer to myBuffer at head position
    */
   concat(fromBuffer) {
     this.validate(fromBuffer);
 
     //copy data from fromBuffer at head Position in myAudioBuffer
-    for (let chIdx = 0; chIdx < this.nChannels; chIdx++) {
-      //this.myAudioBuffer.getChannelData(chIdx).set(fromBuffer.getChannelData(chIdx), this.head);
-
-      //save the squares
-      let channelData = fromBuffer.getChannelData(chIdx);
-      channelData = channelData.map((value) => Math.pow(value, 2));
-      this.myAudioBuffer.getChannelData(chIdx).set(channelData, this.head);
+    let headpos = this.head;
+    for (let idx = 0; idx < fromBuffer.length; idx++) {
+      this.myBuffer[headpos + idx] = fromBuffer[idx];
     }
 
     this.head += fromBuffer.length;
@@ -64,10 +51,6 @@ class CircularAudioBuffer {
       this.head = 0;
       this.isFull = true;
     }
-
-    // console.log('new head:', this.head);
-    // console.log('fromBuffer', fromBuffer.getChannelData(0));
-    // console.log('myAudioBuffer', this.myAudioBuffer.getChannelData(0));
   }
 
   /**
@@ -89,10 +72,13 @@ class CircularAudioBuffer {
    * returns ArrayBuffer of given channel
    * use index from getIndex(index) and length from getLength
    */
-  getMyChannelData(channel) {
-    return this.myAudioBuffer.getChannelData(channel);
+  getData() {
+    return this.myBuffer;
   }
 
+  /**
+   * return the internal ringbuffer index
+   */
   getIndex(index) {
     let internalIndex;
     if (this.isFull) {
