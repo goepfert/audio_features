@@ -17,7 +17,7 @@ class CircularBuffer {
   }
 
   validate(buffer) {
-    if (!this.isAudioBuffer(buffer)) {
+    if (!this.isBuffer(buffer)) {
       console.log(buffer);
       throw new Error('Argument should be an AudioBuffer instance and comply with some assumptions');
     }
@@ -51,6 +51,10 @@ class CircularBuffer {
       this.head = 0;
       this.isFull = true;
     }
+  }
+
+  getHeadPos() {
+    return this.head;
   }
 
   /**

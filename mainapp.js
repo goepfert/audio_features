@@ -1,64 +1,61 @@
-console.log('hello');
-
 // It all starts with a context
-// const context = new AudioContext();
-// const samplerate = context.sampleRate;
+const context = new AudioContext();
+const samplerate = context.sampleRate;
 
-// // Buffer sizes
-// const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the mic)
-// const FRAME_SIZE = samplerate * 0.025; // Frame_time == 25 ms
-// const FRAME_STRIDE = samplerate * 0.01; // Frame_stride == 10 ms (=> 15 ms overlap)
+// Buffer sizes
+const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the mic)
+const FRAME_SIZE = samplerate * 0.025; // Frame_time == 25 ms
+const FRAME_STRIDE = samplerate * 0.01; // Frame_stride == 10 ms (=> 15 ms overlap)
 
-// const buffertime = 1; // in seconds
-// const RECORD_SIZE = Math.floor((samplerate * buffertime) / BUFFER_SIZE) * BUFFER_SIZE; // ensure integer fraction size
+const buffertime = 1; // in seconds
+const RECORD_SIZE = Math.floor((samplerate * buffertime) / BUFFER_SIZE) * BUFFER_SIZE; // ~buffertime in number of samples, ensure integer fraction size
 
-// // Ringbuffer Time Domain (1D)
-// const RB_SIZE = 2 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE
-// //const timeDomainData = Array.from(Array(RB_SIZE), () => 0);
-// const timeDomainData = new CircularBuffer(RB_SIZE);
-// let HEAD_POS = 0;
+// Ringbuffer Time Domain (1D)
+const RB_SIZE = 2 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE
+//const timeDomainData = Array.from(Array(RB_SIZE), () => 0);
+const timeDomainData = new CircularBuffer(RB_SIZE);
 
-// // RingBuffer Framing (2D)
-// const RB_SIZE_FRAMING = utils.getNumberOfFrames(RB_SIZE, FRAME_SIZE, FRAME_STRIDE);
-// const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
+// RingBuffer Framing (2D)
+const RB_SIZE_FRAMING = utils.getNumberOfFrames(RB_SIZE, FRAME_SIZE, FRAME_STRIDE); // how many frames with overlap fit into time domain ringbuffer
+const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
 
-// // Loudness
-// const loudnessSample = new LoudnessSample(samplerate);
-// const targetLKFS = -13; // the target loudness
-// const LKFS_THRESHOLD = -25; // don't scale if LKFS is below this threshold
+// Loudness
+const loudnessSample = new LoudnessSample(samplerate);
+const targetLKFS = -13; // the target loudness
+const LKFS_THRESHOLD = -25; // don't scale if LKFS is below this threshold
 
-// // Hamming Window
-// const window = createWindowing(FRAME_SIZE);
+// Hamming Window
+const fenster = createWindowing(FRAME_SIZE); // don't call it window ...
 
-// // DFT
-// const dft = new DFT(FRAME_SIZE);
-// const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
+// DFT
+const dft = new DFT(FRAME_SIZE);
+const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 
-// // Mel Filter
-// const N_MEL_FILTER = 24; // Number of Mel Filterbanks
-// const filter = mel_filter();
-// const MIN_FREQUENCY = 300; // lower end of first mel filter bank
-// const MAX_FREQUENCY = 6000; // upper end of last mel filterbank
-// filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
+// Mel Filter
+const N_MEL_FILTER = 24; // Number of Mel Filterbanks
+const filter = mel_filter();
+const MIN_FREQUENCY = 300; // lower end of first mel filter bank
+const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
+filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 
-// // Neural Network
-// const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
-// let nn; // defined later
-// let model;
+// Neural Network
+const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
+let nn; // defined later
+let model;
 
-// // Plotting
-// let STARTFRAME; // Recording Startframe (used for drawing)
-// let ENDFRAME; // Recording Endframe (used for drawing)
+// Plotting
+let STARTFRAME; // Recording Startframe (used for drawing)
+let ENDFRAME; // Recording Endframe (used for drawing)
 
-// // Other
-// const MIN_EXP = -1; // 10^{min_exp} linear, log scale minimum
-// const MAX_EXP = 2; // 10^{max_exp} linear, log scale max
+// Other
+const MIN_EXP = -1; // 10^{min_exp} linear, log scale minimum
+const MAX_EXP = 2; // 10^{max_exp} linear, log scale max
 
-// // Prefill arrays
-// for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-//   let ft_array = Array.from(Array(B2P1), () => 0);
-//   DFT_Data.push(ft_array);
-// }
+// Prefill arrays
+for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+  let ft_array = Array.from(Array(B2P1), () => 0);
+  DFT_Data.push(ft_array);
+}
 
 // // old ??
 // const FRAMESIZE = 220; // How many frames of size BUFFERSIZE
@@ -113,67 +110,95 @@ console.log('hello');
 //   canvas_fftSeries_mel.height = h;
 // }
 
-// /**
-//  * Handle mic data
-//  */
-// const handleSuccess = function (stream) {
-//   console.log('handle success');
-//   const source = context.createMediaStreamSource(stream);
+/**
+ * Handle mic data
+ */
+const handleSuccess = function (stream) {
+  console.log('handle success');
+  const source = context.createMediaStreamSource(stream);
 
-//   // Create a ScriptProcessorNode
-//   const processor = context.createScriptProcessor(BUFFERSIZE, 1, 1);
-//   source.connect(processor);
-//   processor.connect(context.destination);
+  // Create a ScriptProcessorNode
+  const processor = context.createScriptProcessor(BUFFER_SIZE, 1, 1);
+  source.connect(processor);
+  processor.connect(context.destination);
 
-//   processor.onaudioprocess = function (e) {
-//     const inputBuffer = e.inputBuffer;
-//     timeDomainData2 = inputBuffer.getChannelData(0);
+  processor.onaudioprocess = function (e) {
+    const inputBuffer = e.inputBuffer;
+    timeDomainData2 = inputBuffer.getChannelData(0);
 
-//     data = inputBuffer.getChannelData(0);
-//     timeDomainData.concat(data);
+    data = inputBuffer.getChannelData(0);
+    timeDomainData.concat(data);
 
-//     // // Shift head of ringbuffer
-//     // SERIES_POS++;
-//     // if (SERIES_POS > FRAMESIZE - 1) {
-//     //   SERIES_POS = 0;
-//     // }
+    doFraming();
 
-//     // TIME_SERIES[SERIES_POS] = Array.from(timeDomainData2);
+    // // Shift head of ringbuffer
+    // SERIES_POS++;
+    // if (SERIES_POS > FRAMESIZE - 1) {
+    //   SERIES_POS = 0;
+    // }
 
-//     // // for illustration purpose !!!
-//     // // Do the Fourier Transformation
-//     // dft.forward(timeDomainData2);
+    // TIME_SERIES[SERIES_POS] = Array.from(timeDomainData2);
 
-//     // // Mapping for log scale
-//     // let mag = 0;
-//     // utils.assert(B2P1 == dft.mag.length, 'checking length of frequency domain data');
-//     // for (let idx = 0; idx < B2P1; idx++) {
-//     //   mag = dft.mag[idx];
-//     //   mag = utils.logRangeMap(mag, MIN_EXP, MAX_EXP, 255, 0);
-//     //   mag = Math.round(mag);
-//     //   DFT_Series[SERIES_POS][idx] = mag;
-//     // }
+    // // for illustration purpose !!!
+    // // Do the Fourier Transformation
+    // dft.forward(timeDomainData2);
 
-//     // // Copy array of mel coefficients
-//     // DFT_Series_mel[SERIES_POS] = Array.from(filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP));
+    // // Mapping for log scale
+    // let mag = 0;
+    // utils.assert(B2P1 == dft.mag.length, 'checking length of frequency domain data');
+    // for (let idx = 0; idx < B2P1; idx++) {
+    //   mag = dft.mag[idx];
+    //   mag = utils.logRangeMap(mag, MIN_EXP, MAX_EXP, 255, 0);
+    //   mag = Math.round(mag);
+    //   DFT_Series[SERIES_POS][idx] = mag;
+    // }
 
-//     // // Clear frames (for drawing start and end of vertical line when recording)
-//     // if (STARTFRAME == SERIES_POS) {
-//     //   STARTFRAME = undefined;
-//     // }
-//     // if (ENDFRAME == SERIES_POS) {
-//     //   ENDFRAME = undefined;
-//     // }
-//   }; //end onprocess mic data
-// };
+    // // Copy array of mel coefficients
+    // DFT_Series_mel[SERIES_POS] = Array.from(filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP));
 
-// /** Kicks off Mic data handle function
-//  * https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
-//  */
-// navigator.mediaDevices
-//   .getUserMedia({ audio: true, video: false })
-//   .then(handleSuccess)
-//   .catch((err) => console.log(err));
+    // // Clear frames (for drawing start and end of vertical line when recording)
+    // if (STARTFRAME == SERIES_POS) {
+    //   STARTFRAME = undefined;
+    // }
+    // if (ENDFRAME == SERIES_POS) {
+    //   ENDFRAME = undefined;
+    // }
+  }; //end onprocess mic data
+};
+
+/** Kicks off Mic data handle function
+ * https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
+ */
+navigator.mediaDevices
+  .getUserMedia({ audio: true, video: false })
+  .then(handleSuccess)
+  .catch((err) => console.log(err));
+
+let lastPos = 0;
+function doFraming() {
+  let headPos = timeDomainData.getHeadPos();
+  let availableData = headPos - lastPos;
+  if (availableData < 0) {
+    availableData = headPos + timeDomainData.getLength() - lastPos;
+  }
+
+  console.log('availableData', availableData, 'FRAME_SIZE', FRAME_SIZE, 'FRAME_STRIDE', FRAME_STRIDE); //, timeDomainData.getHeadPos());
+  if (availableData < FRAME_SIZE) {
+    return;
+  }
+
+  let nFrames = utils.getNumberOfFrames(availableData, FRAME_SIZE, FRAME_STRIDE);
+  let startPos = lastPos;
+  let endPos = lastPos + FRAME_SIZE;
+  for (let idx = 0; idx < nFrames; idx++) {
+    let frame_buffer = timeDomainData.getData().slice(startPos, endPos);
+    startPos += FRAME_STRIDE;
+    endPos += FRAME_STRIDE;
+  }
+
+  lastPos = startPos;
+  console.log('nFrames', nFrames, 'lastPos', lastPos);
+}
 
 // /**
 //  * Recursive draw function
