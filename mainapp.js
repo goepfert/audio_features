@@ -17,6 +17,7 @@ const timeDomainData = new CircularBuffer(RB_SIZE);
 
 // RingBuffer Framing (2D)
 const RB_SIZE_FRAMING = utils.getNumberOfFrames(RB_SIZE, FRAME_SIZE, FRAME_STRIDE); // how many frames with overlap fit into time domain ringbuffer
+let DFT_Data_Pos = 0;
 const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
 
 // Loudness
@@ -76,39 +77,39 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
 //   DFT_Series_mel.push(mel_array);
 // }
 
-// // Canvas width and height
-// let drawit = [false, false, true];
+// Canvas width and height
+let drawit = [true, false, false];
 
-// const w = 4 * FRAMESIZE;
-// const h = 4 * nMelFilter;
+const w = 400; //RB_SIZE;
+const h = 100; //N_MEL_FILTER;
 
-// let canvas;
-// let canvasCtx;
-// let canvas_fftSeries;
-// let context_fftSeries;
-// let canvas_fftSeries_mel;
-// let context_fftSeries_mel;
+let canvas;
+let canvasCtx;
+let canvas_fftSeries;
+let context_fftSeries;
+let canvas_fftSeries_mel;
+let context_fftSeries_mel;
 
-// if (drawit[0]) {
-//   canvas = document.getElementById('oscilloscope');
-//   canvasCtx = canvas.getContext('2d');
-//   canvas.width = w;
-//   canvas.height = B2P1;
-// }
+if (drawit[0]) {
+  canvas = document.getElementById('oscilloscope');
+  canvasCtx = canvas.getContext('2d');
+  canvas.width = w;
+  canvas.height = B2P1;
+}
 
-// if (drawit[1]) {
-//   canvas_fftSeries = document.getElementById('fft-series');
-//   context_fftSeries = canvas_fftSeries.getContext('2d');
-//   canvas_fftSeries.width = w;
-//   canvas_fftSeries.height = B2P1;
-// }
+if (drawit[1]) {
+  canvas_fftSeries = document.getElementById('fft-series');
+  context_fftSeries = canvas_fftSeries.getContext('2d');
+  canvas_fftSeries.width = w;
+  canvas_fftSeries.height = B2P1;
+}
 
-// if (drawit[2]) {
-//   canvas_fftSeries_mel = document.getElementById('fft-series mel');
-//   context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
-//   canvas_fftSeries_mel.width = w;
-//   canvas_fftSeries_mel.height = h;
-// }
+if (drawit[2]) {
+  canvas_fftSeries_mel = document.getElementById('fft-series mel');
+  context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
+  canvas_fftSeries_mel.width = w;
+  canvas_fftSeries_mel.height = h;
+}
 
 /**
  * Handle mic data
@@ -129,7 +130,7 @@ const handleSuccess = function (stream) {
     data = inputBuffer.getChannelData(0);
     timeDomainData.concat(data);
 
-    doFraming();
+    //doFraming();
 
     // // Shift head of ringbuffer
     // SERIES_POS++;
@@ -174,136 +175,147 @@ navigator.mediaDevices
   .then(handleSuccess)
   .catch((err) => console.log(err));
 
-let lastPos = 0;
+let nextStartPos = 0;
 function doFraming() {
   let headPos = timeDomainData.getHeadPos();
-  let availableData = headPos - lastPos;
+  let availableData = headPos - nextStartPos;
   if (availableData < 0) {
-    availableData = headPos + timeDomainData.getLength() - lastPos;
+    availableData = headPos + timeDomainData.getLength() - nextStartPos;
   }
 
-  console.log('availableData', availableData, 'FRAME_SIZE', FRAME_SIZE, 'FRAME_STRIDE', FRAME_STRIDE); //, timeDomainData.getHeadPos());
+  // console.log('availableData', availableData, 'FRAME_SIZE', FRAME_SIZE, 'FRAME_STRIDE', FRAME_STRIDE);
   if (availableData < FRAME_SIZE) {
     return;
   }
 
   let nFrames = utils.getNumberOfFrames(availableData, FRAME_SIZE, FRAME_STRIDE);
-  let startPos = lastPos;
-  let endPos = lastPos + FRAME_SIZE;
+  let startPos = nextStartPos;
+  let endPos = (nextStartPos + FRAME_SIZE) % RB_SIZE;
+
   for (let idx = 0; idx < nFrames; idx++) {
-    let frame_buffer = timeDomainData.getData().slice(startPos, endPos);
-    startPos += FRAME_STRIDE;
-    endPos += FRAME_STRIDE;
+    let frame_buffer = timeDomainData.getSlice(startPos, endPos);
+
+    dft.forward(frame_buffer);
+
+    DFT_Data[DFT_Data_Pos] = Array.from(dft.mag);
+    DFT_Data_Pos = (DFT_Data_Pos + 1) % RB_SIZE_FRAMING;
+
+    startPos = (startPos + FRAME_STRIDE) % RB_SIZE;
+    endPos = (endPos + FRAME_STRIDE) % RB_SIZE;
   }
 
-  lastPos = startPos;
-  console.log('nFrames', nFrames, 'lastPos', lastPos);
+  nextStartPos = startPos;
+  // console.log('nFrames', nFrames, 'nextStartPos', nextStartPos);
 }
 
-// /**
-//  * Recursive draw function
-//  * Called as fast as possible by the browser (as far as I understood)
-//  * Why not making an IIFE ...
-//  */
-// const draw = function () {
-//   // Draw magnitudes
-//   if (drawit[0]) {
-//     canvasCtx.fillStyle = '#FFF';
-//     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+/**
+ * Recursive draw function
+ * Called as fast as possible by the browser (as far as I understood)
+ * Why not making an IIFE ...
+ */
+const draw = function () {
+  // Draw magnitudes
 
-//     let barWidth = canvas.width / B2P1;
-//     let barHeight;
-//     let mag = 0;
-//     let x = 0;
+  if (drawit[0]) {
+    canvasCtx.fillStyle = '#FFF';
+    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-//     for (let i = 0; i < B2P1; i++) {
-//       mag = DFT_Series[SERIES_POS][i];
-//       barHeight = -canvas.height + utils.map(mag, 0, 255, 0, canvas.height);
-//       canvasCtx.fillStyle = utils.rainbow[mag];
-//       canvasCtx.fillRect(x, canvas.height, barWidth, barHeight);
-//       x += barWidth;
-//     }
-//     canvasCtx.strokeRect(0, 0, canvas.width, canvas.height);
+    let barWidth = canvas.width / B2P1;
+    let barHeight;
+    let mag = 0;
+    let x = 0;
 
-//     // Draw time series on top
-//     canvasCtx.beginPath();
-//     canvasCtx.lineWidth = 2;
-//     canvasCtx.strokeStyle = '#000099';
-//     let sliceWidth = canvas.width / BUFFERSIZE;
-//     x = 0;
-//     for (let i = 0; i < BUFFERSIZE; i++) {
-//       let v = timeDomainData[i] + 1;
-//       let y = (v * canvas.height) / 2;
-//       if (i === 0) {
-//         canvasCtx.moveTo(x, y);
-//       } else {
-//         canvasCtx.lineTo(x, y);
-//       }
-//       x += sliceWidth;
-//     }
-//     //canvasCtx.lineTo(canvas.width, canvas.height / 2);
-//     canvasCtx.stroke();
-//   }
+    //console.log(DFT_Data[DFT_Data_Pos]);
 
-//   // Draw FT Time Series
-//   if (drawit[1]) {
-//     context_fftSeries.fillStyle = '#FFF';
-//     context_fftSeries.fillRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
+    for (let i = 0; i < B2P1; i++) {
+      mag = DFT_Data[DFT_Data_Pos][i];
+      barHeight = -canvas.height + utils.map(mag, 0, 255, 0, canvas.height);
+      barHeight = 10;
+      canvasCtx.fillStyle = utils.rainbow[mag];
+      canvasCtx.fillRect(x, canvas.height, barWidth, barHeight);
+      x += barWidth;
+    }
+    canvasCtx.strokeRect(0, 0, canvas.width, canvas.height);
 
-//     let rectHeight = canvas_fftSeries.height / B2P1;
-//     let rectWidth = canvas_fftSeries.width / FRAMESIZE;
-//     let xpos = 0;
-//     let ypos;
-//     for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
-//       ypos = canvas_fftSeries.height;
-//       for (let yidx = 0; yidx < B2P1; yidx++) {
-//         mag = DFT_Series[xidx % FRAMESIZE][yidx];
-//         if (mag != 0) {
-//           context_fftSeries.fillStyle = utils.rainbow[mag];
-//           context_fftSeries.fillRect(xpos, ypos, rectWidth, -rectHeight);
-//         } else {
-//           //
-//         }
-//         ypos -= rectHeight;
-//       }
-//       xpos += rectWidth;
-//     }
-//     context_fftSeries.strokeRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
-//   }
+    // Draw time series on top
+    canvasCtx.beginPath();
+    canvasCtx.lineWidth = 2;
+    canvasCtx.strokeStyle = '#000099';
+    let sliceWidth = canvas.width / BUFFER_SIZE;
+    x = 0;
+    for (let i = 0; i < BUFFER_SIZE; i++) {
+      let v = timeDomainData.getData()[i] + 1;
+      let y = (v * canvas.height) / 2;
+      if (i === 0) {
+        canvasCtx.moveTo(x, y);
+      } else {
+        canvasCtx.lineTo(x, y);
+      }
+      x += sliceWidth;
+    }
+    //canvasCtx.lineTo(canvas.width, canvas.height / 2);
+    canvasCtx.stroke();
+  }
 
-//   // Draw mel spectrum
-//   if (drawit[2]) {
-//     context_fftSeries_mel.fillStyle = '#FFF';
-//     context_fftSeries_mel.fillRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
+  // Draw FT Time Series
+  if (drawit[1]) {
+    context_fftSeries.fillStyle = '#FFF';
+    context_fftSeries.fillRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
 
-//     rectHeight = canvas_fftSeries_mel.height / nMelFilter;
-//     rectWidth = canvas_fftSeries_mel.width / FRAMESIZE;
-//     let xpos = 0;
-//     for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
-//       ypos = canvas_fftSeries_mel.height;
-//       for (let yidx = 0; yidx < nMelFilter; yidx++) {
-//         mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
-//         if (xidx % FRAMESIZE == STARTFRAME || xidx % FRAMESIZE == ENDFRAME) {
-//           context_fftSeries_mel.fillStyle = '#800000';
-//         } else {
-//           context_fftSeries_mel.fillStyle = utils.rainbow[mag];
-//         }
-//         context_fftSeries_mel.fillRect(xpos, ypos, rectWidth, -rectHeight);
-//         ypos -= rectHeight;
-//       }
-//       xpos += rectWidth;
-//     }
+    let rectHeight = canvas_fftSeries.height / B2P1;
+    let rectWidth = canvas_fftSeries.width / FRAMESIZE;
+    let xpos = 0;
+    let ypos;
+    for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
+      ypos = canvas_fftSeries.height;
+      for (let yidx = 0; yidx < B2P1; yidx++) {
+        mag = DFT_Series[xidx % FRAMESIZE][yidx];
+        if (mag != 0) {
+          context_fftSeries.fillStyle = utils.rainbow[mag];
+          context_fftSeries.fillRect(xpos, ypos, rectWidth, -rectHeight);
+        } else {
+          //
+        }
+        ypos -= rectHeight;
+      }
+      xpos += rectWidth;
+    }
+    context_fftSeries.strokeRect(0, 0, canvas_fftSeries.width, canvas_fftSeries.height);
+  }
 
-//     context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
-//   }
+  // Draw mel spectrum
+  if (drawit[2]) {
+    context_fftSeries_mel.fillStyle = '#FFF';
+    context_fftSeries_mel.fillRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
 
-//   // draw asap ... but wait some time to get other things done
-//   setTimeout(() => {
-//     requestAnimationFrame(draw);
-//   }, 30);
-// }; // end draw fcn
+    rectHeight = canvas_fftSeries_mel.height / nMelFilter;
+    rectWidth = canvas_fftSeries_mel.width / FRAMESIZE;
+    let xpos = 0;
+    for (let xidx = SERIES_POS + 1; xidx <= SERIES_POS + FRAMESIZE; xidx++) {
+      ypos = canvas_fftSeries_mel.height;
+      for (let yidx = 0; yidx < nMelFilter; yidx++) {
+        mag = DFT_Series_mel[xidx % FRAMESIZE][yidx];
+        if (xidx % FRAMESIZE == STARTFRAME || xidx % FRAMESIZE == ENDFRAME) {
+          context_fftSeries_mel.fillStyle = '#800000';
+        } else {
+          context_fftSeries_mel.fillStyle = utils.rainbow[mag];
+        }
+        context_fftSeries_mel.fillRect(xpos, ypos, rectWidth, -rectHeight);
+        ypos -= rectHeight;
+      }
+      xpos += rectWidth;
+    }
 
-// draw();
+    context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
+  }
+
+  // draw asap ... but wait some time to get other things done
+  setTimeout(() => {
+    requestAnimationFrame(draw);
+  }, 30);
+}; // end draw fcn
+
+draw();
 
 // // Create Training Data and record buttons
 // let inputs = []; // the recorded data

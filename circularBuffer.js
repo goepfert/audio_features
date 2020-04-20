@@ -102,4 +102,19 @@ class CircularBuffer {
 
     return internalIndex;
   }
+
+  getSlice(startPos, endPos) {
+    let ret = [];
+
+    let len = endPos - startPos;
+    if (len <= 0) {
+      len = endPos + this.length - startPos;
+    }
+
+    for (let idx = 0; idx < len; idx++) {
+      ret[idx] = this.myBuffer[(startPos + idx) % this.length];
+    }
+
+    return ret;
+  }
 }
