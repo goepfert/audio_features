@@ -13,6 +13,7 @@ class CircularBuffer {
     this.myBuffer = Array.from(Array(length), () => 0);
     this.length = length;
     this.head = 0;
+    this.lastHead = 0;
     this.isFull = false;
   }
 
@@ -39,6 +40,8 @@ class CircularBuffer {
    */
   concat(fromBuffer) {
     this.validate(fromBuffer);
+
+    this.lastHead = this.head;
 
     //copy data from fromBuffer at head Position in myAudioBuffer
     let headpos = this.head;
