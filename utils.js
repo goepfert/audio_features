@@ -31,12 +31,28 @@ const utils = (function () {
     }
   }
 
-  function logRangeMap(val, min_exp, max_exp, map_x1, map_x2) {
-    val = Math.log10(val);
+  function rangeMap(val, min_exp, max_exp, map_x1, map_x2) {
     val = constrain(val, min_exp, max_exp);
     val = map(val, min_exp, max_exp, map_x1, map_x2);
 
     return val;
+  }
+
+  function logRangeMap(val, min_exp, max_exp, map_x1, map_x2) {
+    val = Math.log10(val);
+    val = rangeMap(val, min_exp, max_exp, map_x1, map_x2);
+
+    return val;
+  }
+
+  function rangeMapBuffer(buffer, min_exp, max_exp, map_x1, map_x2) {
+    let ret = [];
+
+    for(let idx = 0; idx < buffer.length; idx++) {
+      ret.push(rangeMap(buffer[idx], min_exp, max_exp, map_x1, map_x2));
+    }
+
+    return ret;
   }
 
   function indexOfMax(arr) {
@@ -89,7 +105,9 @@ const utils = (function () {
     map: map,
     constrain: constrain,
     assert: assert,
+    rangeMap: rangeMap,
     logRangeMap: logRangeMap,
+    rangeMapBuffer: rangeMapBuffer,
     indexOfMax: indexOfMax,
     decibelsToLinear: decibelsToLinear,
     linearToDecibels: linearToDecibels,

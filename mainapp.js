@@ -1,5 +1,5 @@
 // It all starts with a context
-const context = new AudioContext();
+const context = new AudioContext({samplerate: 16000});
 const samplerate = context.sampleRate;
 
 // Buffer sizes
@@ -22,7 +22,7 @@ const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
 const LOG_MEL = [];
 const DCT = [];
 
-console.log(BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING);
+console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING);
 
 // Loudness
 const loudnessSample = new LoudnessSample(samplerate);
@@ -88,7 +88,7 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
 // }
 
 // Canvas width and height
-let drawit = [false, true, true, true];
+let drawit = [true, true, true, true];
 
 const w = RB_SIZE_FRAMING;
 const h = 100; //N_MEL_FILTER;
@@ -219,18 +219,22 @@ function doFraming() {
 
     DFT_Data[Data_Pos] = Array.from(dft.mag);
 
-    let mel_array = filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP);
+    let mel_array = filter.getLogMelCoefficients(dft.mag); // not limited
 
     if (idx == 0) {
-      console.log('mel', mel_array);
+      //console.log('mel', mel_array);
     }
 
-    LOG_MEL[Data_Pos] = Array.from(mel_array);
-    fastDctLee.transform(mel_array);
-    DCT[Data_Pos] = Array.from(mel_array);
+    let mel_array_constrained = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
+    LOG_MEL[Data_Pos] = Array.from(mel_array_constrained);
 
+    fastDctLee.transform(mel_array)
+    let dct_array = Array.from( mel_array );
+    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -10, 5, 255, 0);
+    
     if (idx == 0) {
-      console.log('dct', mel_array);
+      console.log('dct1', dct_array);
+      console.log('dct2', DCT[Data_Pos]);
       console.log('---');
     }
 
@@ -333,6 +337,7 @@ const draw = function () {
       ypos = canvas_fftSeries_mel.height;
       for (let yidx = 0; yidx < N_MEL_FILTER; yidx++) {
         mag = LOG_MEL[xidx % RB_SIZE_FRAMING][yidx];
+        mag = Math.round(mag);
         if (xidx % RB_SIZE_FRAMING == STARTFRAME || xidx % RB_SIZE_FRAMING == ENDFRAME) {
           context_fftSeries_mel.fillStyle = '#800000';
         } else {
@@ -360,8 +365,7 @@ const draw = function () {
       ypos = canvas_fftSeries_dct.height;
       for (let yidx = 0; yidx < N_MEL_FILTER; yidx++) {
         mag = DCT[xidx % RB_SIZE_FRAMING][yidx];
-        mag = utils.constrain(mag, -10, 10);
-        mag = utils.map(mag, -10, 10, 0, 255);
+        mag = Math.round(mag);
 
         if (xidx % RB_SIZE_FRAMING == STARTFRAME || xidx % RB_SIZE_FRAMING == ENDFRAME) {
           context_fftSeries_dct.fillStyle = '#800000';
@@ -380,7 +384,7 @@ const draw = function () {
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 20);
+  }, 200);
 }; // end draw fcn
 
 draw();
