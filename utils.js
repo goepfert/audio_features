@@ -48,8 +48,18 @@ const utils = (function () {
   function rangeMapBuffer(buffer, min_exp, max_exp, map_x1, map_x2) {
     let ret = [];
 
-    for(let idx = 0; idx < buffer.length; idx++) {
+    for (let idx = 0; idx < buffer.length; idx++) {
       ret.push(rangeMap(buffer[idx], min_exp, max_exp, map_x1, map_x2));
+    }
+
+    return ret;
+  }
+
+  function logRangeMapBuffer(buffer, min_exp, max_exp, map_x1, map_x2) {
+    let ret = [];
+
+    for (let idx = 0; idx < buffer.length; idx++) {
+      ret.push(logRangeMap(buffer[idx], min_exp, max_exp, map_x1, map_x2));
     }
 
     return ret;
@@ -108,6 +118,7 @@ const utils = (function () {
     rangeMap: rangeMap,
     logRangeMap: logRangeMap,
     rangeMapBuffer: rangeMapBuffer,
+    logRangeMapBuffer: logRangeMapBuffer,
     indexOfMax: indexOfMax,
     decibelsToLinear: decibelsToLinear,
     linearToDecibels: linearToDecibels,

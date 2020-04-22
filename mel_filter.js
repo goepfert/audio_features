@@ -99,7 +99,11 @@ let mel_filter = function () {
     let melArray = [];
     for (let mIdx = 0; mIdx < _nMel; mIdx++) {
       let m = getMelCoefficient(mIdx, buffer);
-      m = Math.log10(m);
+      if (m < 1e-100) {
+        m = -100;
+      } else {
+        m = Math.log10(m);
+      }
       //m = utils.logRangeMap(m, min, max, 255, 0);
       //m = Math.round(m);
       melArray.push(m);
