@@ -17,10 +17,12 @@ const timeDomainData = new CircularBuffer(RB_SIZE);
 
 // RingBuffer Framing (2D)
 const RB_SIZE_FRAMING = utils.getNumberOfFrames(RB_SIZE, FRAME_SIZE, FRAME_STRIDE); // how many frames with overlap fit into time domain ringbuffer
+const RECORD_SIZE_FRAMING = utils.getNumberOfFrames(RECORD_SIZE, FRAME_SIZE, FRAME_STRIDE); // number of frames in record
 let Data_Pos = 0;
 const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
-const LOG_MEL = [];
-const DCT = [];
+const LOG_MEL = []; // log mel filter coefficients
+const DCT_RAW = []; // dct -> to be mean normalized
+const DCT = []; // dct range map
 
 console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING);
 
@@ -205,6 +207,7 @@ function doFraming() {
     // _dct_min = dct_min < _dct_min ? dct_min : _dct_min;
     // dct_max = Math.max(...dct_array);
     // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
+    DCT_RAW[Data_Pos] = Array.from(dct_array);
     DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -20, 20, 255, 0);
 
     // Bookeeping
@@ -360,213 +363,174 @@ const draw = function () {
 
 draw();
 
-// // Create Training Data and record buttons
-// let inputs = []; // the recorded data
-// const record_btns_div = document.getElementById('record_btns');
-// for (let idx = 0; idx < NCLASSES; idx++) {
-//   inputs.push({
-//     label: `class${idx + 1}`, // class label
-//     data_adapted: [], // the loudness scaled image (mel spectrum)
-//     data: [], // the unscaled image (mel spectrum)
-//   });
+// Create Training Data and record buttons
+let inputs = []; // the recorded data
+const record_btns_div = document.getElementById('record_btns');
+for (let idx = 0; idx < NCLASSES; idx++) {
+  inputs.push({
+    label: `class${idx + 1}`, // class label
+    data: [], // the unscaled dct image
+  });
 
-//   const btn = document.createElement('button');
-//   btn.classList.add('record_btn');
-//   btn.id = `class${idx + 1}`;
-//   btn.innerHTML = `Record class${idx + 1}`;
-//   const label = document.createElement('label');
-//   label.htmlFor = `class${idx + 1}`;
-//   record_btns_div.appendChild(btn);
-//   record_btns_div.appendChild(label);
-// }
+  const btn = document.createElement('button');
+  btn.classList.add('record_btn');
+  btn.id = `class${idx + 1}`;
+  btn.innerHTML = `Record class${idx + 1}`;
+  const label = document.createElement('label');
+  label.htmlFor = `class${idx + 1}`;
+  record_btns_div.appendChild(btn);
+  record_btns_div.appendChild(label);
+}
 
-// // take a snapshot on click
-// const RECORDTIME = 1000; //ms
-// const RECORDBUFFER = Math.floor(((samplerate / 1000) * RECORDTIME) / BUFFERSIZE + 1); // nBuffer of Size Recordbuffer
-// //const buffertime = (BUFFERSIZE / (samplerate / 1000)) * FRAMESIZE;
-// utils.assert(buffertime > RECORDTIME, 'buffertime too small for recordings');
+/**
+ * Get collection of buttons
+ */
+const record_btns = document.getElementsByClassName('record_btn');
+const train_btn = document.getElementById('train_btn');
+const predict_btn = document.getElementById('predict_btn');
+const showImages_btn = document.getElementById('showImages_btn');
+toggleButtons(false);
 
-// /**
-//  * Get collection of buttons
-//  */
-// const record_btns = document.getElementsByClassName('record_btn');
-// const train_btn = document.getElementById('train_btn');
-// const predict_btn = document.getElementById('predict_btn');
-// const showImages_btn = document.getElementById('showImages_btn');
-// toggleButtons(false);
+/**
+ * extract snapshot of RECORDTIME from ringbuffer
+ * calculate loudness of snapshot
+ * scale timeseries with gain correction (to given loudness)
+ * apply dft on adated timeseries (-> hope this makes some sense to do it this way)
+ * image[] contains the 'raw' mel filter 2d array
+ */
+function record(e, label) {
+  //let endFrame = SERIES_POS;
+  ENDFRAME = (STARTFRAME + RECORD_SIZE_FRAMING) % RB_SIZE_FRAMING;
+  let image = [];
+  let curpos = STARTFRAME;
 
-// /**
-//  * extract snapshot of RECORDTIME from ringbuffer
-//  * calculate loudness of snapshot
-//  * scale timeseries with gain correction (to given loudness)
-//  * apply dft on adated timeseries (-> hope this makes some sense to do it this way)
-//  * image[] contains the 'raw' mel filter 2d array
-//  * image_adapted[] contains the loudness normalized mel filter 2d array
-//  */
-// function record(e, label) {
-//   //let endFrame = SERIES_POS;
-//   ENDFRAME = (STARTFRAME + RECORDBUFFER) % FRAMESIZE;
-//   let image = [];
-//   let timeseries = [];
-//   let curpos = STARTFRAME;
+  for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
+    image[idx] = Array.from(DCT_RAW[idx]);
 
-//   for (let idx = 0; idx < FRAMESIZE; idx++) {
-//     timeseries.push([...TIME_SERIES[curpos]]);
-//     image[idx] = DFT_Series_mel[curpos].map((m) => {
-//       return utils.map(m, 0, 255, 1, -1);
-//     });
-//     curpos++;
-//     if (curpos >= FRAMESIZE) {
-//       curpos = 0;
-//     }
-//     if (curpos == ENDFRAME) {
-//       break;
-//     }
-//   }
+    curpos++;
+    if (curpos >= RECORD_SIZE_FRAMING) {
+      curpos = 0;
+    }
+    if (curpos == ENDFRAME) {
+      break;
+    }
+  }
 
-//   // post loudness calculation
-//   // calculate loudness an time series between start and endframe
-//   let loudness = loudnessSample.calculateLoudness([].concat.apply([], timeseries));
-//   let dB = loudness - targetLKFS;
-//   let targetGain = 1;
-//   if (loudness > LKFS_THRESHOLD) {
-//     targetGain = 1 / utils.decibelsToLinear(dB);
-//   }
-//   console.log(loudness, targetGain);
+  utils.minMaxNormalize(image);
 
-//   // post DFT
-//   let image_adapted = [];
-//   for (let idx = 0; idx < timeseries.length; idx++) {
-//     //TODO: scale timeseries
-//     let timeseries_adapted = timeseries[idx].map((ts) => targetGain * ts);
+  let index = inputs.findIndex((input) => input.label == label);
+  inputs[index].data.push(image);
+  e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
+  console.log('recording finished');
+  toggleButtons(false);
+} // end recording
 
-//     // Do the Fourier Transformation
-//     dft.forward(timeseries_adapted);
-//     utils.assert(B2P1 == dft.mag.length);
+// Event listeners for record buttons
+for (let idx = 0; idx < record_btns.length; idx++) {
+  record_btns[idx].addEventListener('click', (e) => {
+    toggleButtons(true);
+    let label = record_btns[idx].id;
+    console.log('record:', label);
+    STARTFRAME = Data_Pos;
+    ENDFRAME = undefined;
+    setTimeout(() => {
+      record(e, label);
+    }, buffertime * 1000); //Fuck ... not always the same length (but always larger :))
+  });
+}
 
-//     // Copy array of mel coefficients
-//     let tmp = filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP);
-//     image_adapted.push(
-//       tmp.map((m) => {
-//         return utils.map(m, 0, 255, 1, -1);
-//       })
-//     );
-//   }
+function toggleRecordButtons(flag) {
+  for (let idx = 0; idx < record_btns.length; idx++) {
+    record_btns[idx].disabled = flag;
+  }
+}
 
-//   let index = inputs.findIndex((input) => input.label == label);
-//   inputs[index].data.push(image);
-//   inputs[index].data_adapted.push(image_adapted);
-//   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
-//   console.log('recording finished');
-//   toggleButtons(false);
-// } // end recording
+function togglePredictButton(flag) {
+  predict_btn.disabled = flag;
+}
+togglePredictButton(false);
 
-// // Event listeners for record buttons
-// for (let idx = 0; idx < record_btns.length; idx++) {
-//   record_btns[idx].addEventListener('click', (e) => {
-//     toggleButtons(true);
-//     let label = record_btns[idx].id;
-//     console.log('record:', label);
-//     STARTFRAME = SERIES_POS;
-//     ENDFRAME = undefined;
-//     setTimeout(() => {
-//       record(e, label);
-//     }, RECORDTIME); //Fuck ... not always the same length (but always larger :))
-//   });
-// }
+function toggleButtons(flag) {
+  toggleRecordButtons(flag);
+  showImages_btn.disabled = flag;
+  train_btn.disabled = flag;
+}
 
-// function toggleRecordButtons(flag) {
-//   for (let idx = 0; idx < record_btns.length; idx++) {
-//     record_btns[idx].disabled = flag;
-//   }
-// }
+/**
+ * convert data to tensors
+ */
+function createData() {
+  let _labelList = [];
+  let _xData = [];
+  let _yData = [];
+  let _dataSize = 0;
 
-// function togglePredictButton(flag) {
-//   predict_btn.disabled = flag;
-// }
-// togglePredictButton(false);
+  function createLabelList() {
+    let nLabels = inputs.length;
+    for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
+      _labelList.push(inputs[dataIdx].label);
+    }
+  }
 
-// function toggleButtons(flag) {
-//   toggleRecordButtons(flag);
-//   showImages_btn.disabled = flag;
-//   train_btn.disabled = flag;
-// }
+  function shuffle(obj1, obj2) {
+    let index = obj1.length;
+    let rnd, tmp1, tmp2;
 
-// /**
-//  * convert data to tensors
-//  */
-// function createData() {
-//   let _labelList = [];
-//   let _xData = [];
-//   let _yData = [];
-//   let _dataSize = 0;
+    while (index) {
+      rnd = Math.floor(Math.random() * index);
+      index -= 1;
+      tmp1 = obj1[index];
+      tmp2 = obj2[index];
+      obj1[index] = obj1[rnd];
+      obj2[index] = obj2[rnd];
+      obj1[rnd] = tmp1;
+      obj2[rnd] = tmp2;
+    }
+  }
 
-//   function createLabelList() {
-//     let nLabels = inputs.length;
-//     for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
-//       _labelList.push(inputs[dataIdx].label);
-//     }
-//   }
+  (function convertData() {
+    createLabelList();
 
-//   function shuffle(obj1, obj2) {
-//     let index = obj1.length;
-//     let rnd, tmp1, tmp2;
+    let nLabels = inputs.length;
+    _xData = [];
+    _yData = [];
+    for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
+      for (let idx = 0; idx < inputs[dataIdx].data_adapted.length; idx++) {
+        _xData.push(inputs[dataIdx].data_adapted[idx]);
+        _yData.push(_labelList.indexOf(inputs[dataIdx].label));
+        _dataSize++;
+      }
+    }
 
-//     while (index) {
-//       rnd = Math.floor(Math.random() * index);
-//       index -= 1;
-//       tmp1 = obj1[index];
-//       tmp2 = obj2[index];
-//       obj1[index] = obj1[rnd];
-//       obj2[index] = obj2[rnd];
-//       obj1[rnd] = tmp1;
-//       obj2[rnd] = tmp2;
-//     }
-//   }
+    shuffle(_xData, _yData);
+  })();
 
-//   (function convertData() {
-//     createLabelList();
+  function getXs() {
+    let xs = tf.tensor3d(_xData);
+    xs = xs.reshape([_dataSize, RECORDBUFFER, nMelFilter, 1]);
+    return xs;
+  }
 
-//     let nLabels = inputs.length;
-//     _xData = [];
-//     _yData = [];
-//     for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
-//       for (let idx = 0; idx < inputs[dataIdx].data_adapted.length; idx++) {
-//         _xData.push(inputs[dataIdx].data_adapted[idx]);
-//         _yData.push(_labelList.indexOf(inputs[dataIdx].label));
-//         _dataSize++;
-//       }
-//     }
+  function getYs() {
+    let labelstensor = tf.tensor1d(_yData, 'int32');
+    let ys = tf.oneHot(labelstensor, inputs.length);
+    labelstensor.dispose();
+    return ys;
+  }
 
-//     shuffle(_xData, _yData);
-//   })();
+  return {
+    xs: getXs,
+    ys: getYs,
+  };
+}
 
-//   function getXs() {
-//     let xs = tf.tensor3d(_xData);
-//     xs = xs.reshape([_dataSize, RECORDBUFFER, nMelFilter, 1]);
-//     return xs;
-//   }
+/**
+ * Create Network and attach training to training button
+ */
 
-//   function getYs() {
-//     let labelstensor = tf.tensor1d(_yData, 'int32');
-//     let ys = tf.oneHot(labelstensor, inputs.length);
-//     labelstensor.dispose();
-//     return ys;
-//   }
-
-//   return {
-//     xs: getXs,
-//     ys: getYs,
-//   };
-// }
-
-// /**
-//  * Create Network and attach training to training button
-//  */
-
-// // const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
-// // const model = nn.getModel();
-// // tfvis.show.modelSummary({ name: 'Model Summary' }, model);
+// const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
+// const model = nn.getModel();
+// tfvis.show.modelSummary({ name: 'Model Summary' }, model);
 
 // train_btn.addEventListener('click', async () => {
 //   toggleButtons(true);
@@ -694,36 +658,36 @@ draw();
 //   }, INTERVALL);
 // });
 
-// // who understands what is happening here, feel free to explain it to me :)
-// function transpose(a) {
-//   return a[0].map((_, c) => a.map((r) => utils.map(r[c], -1, 1, 255, 0)));
-// }
+// who understands what is happening here, feel free to explain it to me :)
+function transpose(a) {
+  return a[0].map((_, c) => a.map((r) => utils.map(r[c], -1, 1, 0, 255)));
+}
 
-// showImages_btn.addEventListener('click', async () => {
-//   const surface = tfvis.visor().surface({
-//     name: 'Recorded Images',
-//     tab: 'Input Data',
-//   });
-//   const drawArea = surface.drawArea; // Get the examples
-//   drawArea.innerHTML = '';
-//   const MAX = 20;
-//   for (let classIdx = 0; classIdx < inputs.length; classIdx++) {
-//     const p = document.createElement('p');
-//     p.innerText = inputs[classIdx].label;
-//     drawArea.appendChild(p);
-//     for (let idx = 0; idx < inputs[classIdx].data_adapted.length; idx++) {
-//       if (idx >= MAX) {
-//         break;
-//       }
-//       const canvas = document.createElement('canvas');
-//       canvas.width = RECORDBUFFER + 2;
-//       canvas.height = nMelFilter + 2;
-//       canvas.style = 'margin: 1px; border: solid 1px';
-//       await tf.browser.toPixels(transpose(inputs[classIdx].data_adapted[idx]).reverse(), canvas);
-//       drawArea.appendChild(canvas);
-//     }
-//   }
-// });
+showImages_btn.addEventListener('click', async () => {
+  const surface = tfvis.visor().surface({
+    name: 'Recorded Images',
+    tab: 'Input Data',
+  });
+  const drawArea = surface.drawArea; // Get the examples
+  drawArea.innerHTML = '';
+  const MAX = 20;
+  for (let classIdx = 0; classIdx < inputs.length; classIdx++) {
+    const p = document.createElement('p');
+    p.innerText = inputs[classIdx].label;
+    drawArea.appendChild(p);
+    for (let idx = 0; idx < inputs[classIdx].data.length; idx++) {
+      if (idx >= MAX) {
+        break;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = RECORD_SIZE_FRAMING + 2;
+      canvas.height = N_DCT + 2;
+      canvas.style = 'margin: 1px; border: solid 1px';
+      await tf.browser.toPixels(transpose(inputs[classIdx].data[idx]).reverse(), canvas);
+      drawArea.appendChild(canvas);
+    }
+  }
+});
 
 // const save_btn = document.getElementById('save_btn');
 // save_btn.addEventListener('click', () => {

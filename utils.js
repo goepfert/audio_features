@@ -95,18 +95,91 @@ const utils = (function () {
   }
 
   function getNumberOfFrames(total_size, frame_size, frame_stride) {
-    let number = 0;
-    // for (let idx = 0; idx < total_size; idx += frame_stride) {
-    //   if (idx + frame_size > total_size) {
-    //     number = idx;
-    //     break;
-    //   }
-    // }
+    return 1 + Math.floor((total_size - frame_size) / frame_stride);
+  }
 
-    // or
-    number = 1 + Math.floor((total_size - frame_size) / frame_stride);
+  // [-1, 1]
+  function meanNormalize(buffer2D) {
+    let nRow = buffer2D.length;
+    let nCol = buffer2D[0].length;
 
-    return number;
+    let mean = 0;
+    let min = 1e6;
+    let max = -1e6;
+    for (let row = 0; row < nRow; row++) {
+      for (let col = 0; col < nCol; col++) {
+        let val = buffer2D[row][col];
+        mean += val;
+        min = val < min ? val : min;
+        max = val > max ? val : max;
+      }
+    }
+    mean /= nRow * nCol;
+
+    // console.log(mean, min, max);
+
+    for (let row = 0; row < nRow; row++) {
+      for (let col = 0; col < nCol; col++) {
+        buffer2D[row][col] = (buffer2D[row][col] - mean) / (max - min);
+      }
+    }
+  }
+
+  // [0, 1]
+  function minMaxNormalize(buffer2D) {
+    let nRow = buffer2D.length;
+    let nCol = buffer2D[0].length;
+
+    let mean = 0;
+    let min = 1e6;
+    let max = -1e6;
+    for (let row = 0; row < nRow; row++) {
+      for (let col = 0; col < nCol; col++) {
+        let val = buffer2D[row][col];
+        mean += val;
+        min = val < min ? val : min;
+        max = val > max ? val : max;
+      }
+    }
+    mean /= nRow * nCol;
+
+    // console.log(mean, min, max);
+
+    for (let row = 0; row < nRow; row++) {
+      for (let col = 0; col < nCol; col++) {
+        buffer2D[row][col] = (buffer2D[row][col] - min) / (max - min);
+      }
+    }
+  }
+
+  function standardize(buffer2D) {
+    let nRow = buffer2D.length;
+    let nCol = buffer2D[0].length;
+
+    let mean = 0;
+    let sigma = 0;
+    for (let row = 0; row < nRow; row++) {
+      for (let col = 0; col < nCol; col++) {
+        mean = buffer2D[row][col];
+      }
+    }
+    mean /= nRow * nCol;
+
+    for (let row = 0; row < nRow; row++) {
+      for (let col = 0; col < nCol; col++) {
+        sigma += Math.pow(buffer2D[row][col] - mean, 2);
+      }
+    }
+    sigma /= nRow * nCol - 1;
+    sigma = Math.sqrt(sigma);
+
+    // console.log(mean, sigma);
+
+    for (let row = 0; row < nRow; row++) {
+      for (let col = 0; col < nCol; col++) {
+        buffer2D[row][col] = (buffer2D[row][col] - mean) / sigma;
+      }
+    }
   }
 
   return {
@@ -123,5 +196,8 @@ const utils = (function () {
     decibelsToLinear: decibelsToLinear,
     linearToDecibels: linearToDecibels,
     getNumberOfFrames: getNumberOfFrames,
+    meanNormalize: meanNormalize,
+    minMaxNormalize: minMaxNormalize,
+    standardize: standardize,
   };
 })();
