@@ -8,7 +8,7 @@ const utils = (function () {
 
   for (let idx = 0; idx < 256; idx++) {
     _grayscale[idx] = `rgb(${idx}, ${idx}, ${idx})`;
-    _rainbow[idx] = `hsl(${idx},100%,50%)`;
+    _rainbow[idx] = `hsl(${idx},80%,50%)`;
   }
 
   function map(value, x1, y1, x2, y2) {
@@ -172,8 +172,6 @@ const utils = (function () {
     }
     sigma /= nRow * nCol - 1;
     sigma = Math.sqrt(sigma);
-
-    // console.log(mean, sigma);
 
     for (let row = 0; row < nRow; row++) {
       for (let col = 0; col < nCol; col++) {

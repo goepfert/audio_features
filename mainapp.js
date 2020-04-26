@@ -4,14 +4,14 @@ const samplerate = context.sampleRate;
 
 // Buffer sizes
 const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the mic)
-const FRAME_SIZE = samplerate * 0.025; // Frame_time == 25 ms
+const FRAME_SIZE = 2048; // samplerate * 0.025; // Frame_time == 25 ms
 const FRAME_STRIDE = samplerate * 0.01; // Frame_stride == 10 ms (=> 15 ms overlap)
 
 const buffertime = 1; // in seconds
 const RECORD_SIZE = Math.floor((samplerate * buffertime) / BUFFER_SIZE) * BUFFER_SIZE; // ~buffertime in number of samples, ensure integer fraction size
 
 // Ringbuffer Time Domain (1D)
-const RB_SIZE = 3 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE
+const RB_SIZE = 1.5 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE
 //const timeDomainData = Array.from(Array(RB_SIZE), () => 0);
 const timeDomainData = new CircularBuffer(RB_SIZE);
 
@@ -24,8 +24,6 @@ const LOG_MEL = []; // log mel filter coefficients
 const DCT_RAW = []; // dct -> to be mean normalized
 const DCT = []; // dct range map
 
-console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING);
-
 // Loudness
 const loudnessSample = new LoudnessSample(samplerate);
 const targetLKFS = -13; // the target loudness
@@ -35,7 +33,8 @@ const LKFS_THRESHOLD = -25; // don't scale if LKFS is below this threshold
 const fenster = createWindowing(FRAME_SIZE); // don't call it window ...
 
 // DFT
-const dft = new DFT(FRAME_SIZE);
+//const dft = new DFT(FRAME_SIZE);
+const fft = new FFT(FRAME_SIZE, samplerate);
 const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 
 // Mel Filter
@@ -49,9 +48,11 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 const N_DCT = 12; // discard first and keep second undtil you have N_DCT
 
 // Neural Network
-const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
+const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
 let nn; // defined later
 let model;
+
+console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT);
 
 // Plotting
 let STARTFRAME; // Recording Startframe (used for drawing)
@@ -74,7 +75,7 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
 }
 
 // Canvas width and height
-let drawit = [false, false, true, true];
+let drawit = [true, false, true, true];
 
 const w = RB_SIZE_FRAMING;
 const h = 100; //N_MEL_FILTER;
@@ -137,13 +138,13 @@ const handleSuccess = function (stream) {
 
     doFraming();
 
-    // // Clear frames (for drawing start and end of vertical line when recording)
-    // if (STARTFRAME == SERIES_POS) {
-    //   STARTFRAME = undefined;
-    // }
-    // if (ENDFRAME == SERIES_POS) {
-    //   ENDFRAME = undefined;
-    // }
+    // Clear frames (for drawing start and end of vertical line when recording)
+    if (STARTFRAME == Data_Pos) {
+      STARTFRAME = undefined;
+    }
+    if (ENDFRAME == Data_Pos) {
+      ENDFRAME = undefined;
+    }
   }; //end onprocess mic data
 };
 
@@ -185,30 +186,36 @@ function doFraming() {
     fenster.hamming(frame_buffer);
 
     // Fourier Transform
-    dft.forward(frame_buffer);
+    //dft.forward(frame_buffer);
+    fft.forward(frame_buffer);
+    let spec = fft.spectrum;
+    for (let idx = 0; idx < spec.length; idx++) {
+      spec[idx] = (spec[idx] * FRAME_SIZE) / 2;
+    }
+
     // mag_min = Math.min(...dft.mag);
     // _mag_min = mag_min < _mag_min ? mag_min : _mag_min;
     // mag_max = Math.max(...dft.mag);
     // _mag_max = mag_max > _mag_max ? mag_max : _mag_max;
-    DFT_Data[Data_Pos] = utils.logRangeMapBuffer(dft.mag, MIN_EXP, MAX_EXP, 255, 0);
+    DFT_Data[Data_Pos] = utils.logRangeMapBuffer(spec, MIN_EXP, MAX_EXP, 255, 0);
 
-    // MelFilter
-    let mel_array = filter.getLogMelCoefficients(dft.mag);
+    // MelFilter;
+    let mel_array = filter.getLogMelCoefficients(spec);
     // mel_min = Math.min(...mel_array);
     // _mel_min = mel_min < _mel_min ? mel_min : _mel_min;
     // mel_max = Math.max(...mel_array);
     // _mel_max = mel_max > _mel_max ? mel_max : _mel_max;
-    LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
+    //LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
 
     // Discrete Cosine Transform
-    fastDctLee.transform(mel_array);
-    let dct_array = mel_array.slice(1, 1 + N_DCT);
-    // dct_min = Math.min(...dct_array);
-    // _dct_min = dct_min < _dct_min ? dct_min : _dct_min;
-    // dct_max = Math.max(...dct_array);
-    // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
-    DCT_RAW[Data_Pos] = Array.from(dct_array);
-    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -20, 20, 255, 0);
+    // fastDctLee.transform(mel_array);
+    // let dct_array = mel_array.slice(1, 1 + N_DCT);
+    // // dct_min = Math.min(...dct_array);
+    // // _dct_min = dct_min < _dct_min ? dct_min : _dct_min;
+    // // dct_max = Math.max(...dct_array);
+    // // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
+    // DCT_RAW[Data_Pos] = Array.from(dct_array);
+    // DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -20, 20, 255, 0);
 
     // Bookeeping
     Data_Pos = (Data_Pos + 1) % RB_SIZE_FRAMING;
@@ -358,7 +365,7 @@ const draw = function () {
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 20);
+  }, 50);
 }; // end draw fcn
 
 draw();
@@ -408,7 +415,7 @@ function record(e, label) {
     image[idx] = Array.from(DCT_RAW[idx]);
 
     curpos++;
-    if (curpos >= RECORD_SIZE_FRAMING) {
+    if (curpos >= RB_SIZE_FRAMING) {
       curpos = 0;
     }
     if (curpos == ENDFRAME) {
@@ -416,7 +423,9 @@ function record(e, label) {
     }
   }
 
-  utils.minMaxNormalize(image);
+  // TODO:
+  utils.meanNormalize(image);
+  //utils.standardize(image);
 
   let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
@@ -495,8 +504,8 @@ function createData() {
     _xData = [];
     _yData = [];
     for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
-      for (let idx = 0; idx < inputs[dataIdx].data_adapted.length; idx++) {
-        _xData.push(inputs[dataIdx].data_adapted[idx]);
+      for (let idx = 0; idx < inputs[dataIdx].data.length; idx++) {
+        _xData.push(inputs[dataIdx].data[idx]);
         _yData.push(_labelList.indexOf(inputs[dataIdx].label));
         _dataSize++;
       }
@@ -507,7 +516,7 @@ function createData() {
 
   function getXs() {
     let xs = tf.tensor3d(_xData);
-    xs = xs.reshape([_dataSize, RECORDBUFFER, nMelFilter, 1]);
+    xs = xs.reshape([_dataSize, RECORD_SIZE_FRAMING, N_DCT, 1]);
     return xs;
   }
 
@@ -527,140 +536,106 @@ function createData() {
 /**
  * Create Network and attach training to training button
  */
+train_btn.addEventListener('click', async () => {
+  toggleButtons(true);
+  nn = createNetwork(RECORD_SIZE_FRAMING, N_DCT, inputs.length);
+  model = nn.getModel();
+  tfvis.show.modelSummary({ name: 'Model Summary' }, model);
+  const data = createData();
+  await nn.train(data.xs(), data.ys(), model);
+  console.log('training finished');
+  togglePredictButton(false);
+});
 
-// const nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
-// const model = nn.getModel();
-// tfvis.show.modelSummary({ name: 'Model Summary' }, model);
+/**
+ * Predict section
+ */
+function predict(endFrame) {
+  //let startFrame = (endFrame - RECORDBUFFER) % FRAMESIZE;
+  let startFrame = (endFrame - RECORD_SIZE_FRAMING) % RB_SIZE_FRAMING;
+  if (startFrame < 0) {
+    startFrame = RECORD_SIZE_FRAMING + startFrame;
+  }
+  let image = [];
+  let curpos = startFrame;
+  for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
+    image[idx] = Array.from(DCT_RAW[idx]);
 
-// train_btn.addEventListener('click', async () => {
-//   toggleButtons(true);
-//   nn = createNetwork(RECORDBUFFER, nMelFilter, inputs.length);
-//   model = nn.getModel();
-//   tfvis.show.modelSummary({ name: 'Model Summary' }, model);
-//   const data = createData();
-//   await nn.train(data.xs(), data.ys(), model);
-//   console.log('training finished');
-//   togglePredictButton(false);
-// });
+    curpos++;
+    if (curpos >= RB_SIZE_FRAMING) {
+      curpos = 0;
+    }
+    if (curpos == endFrame) {
+      break;
+    }
+  }
 
-// /**
-//  * Predict section
-//  */
-// function predict(endFrame) {
-//   //let startFrame = (endFrame - RECORDBUFFER) % FRAMESIZE;
-//   let startFrame = (endFrame - RECORDBUFFER) % FRAMESIZE;
-//   if (startFrame < 0) {
-//     startFrame = FRAMESIZE + startFrame;
-//   }
-//   let image = [];
-//   let timeseries = [];
-//   let curpos = startFrame;
-//   for (let idx = 0; idx < FRAMESIZE; idx++) {
-//     timeseries.push([...TIME_SERIES[curpos]]);
-//     image[idx] = DFT_Series_mel[curpos].map((m) => {
-//       return utils.map(m, 0, 255, 1, -1);
-//     });
-//     curpos++;
-//     if (curpos >= FRAMESIZE) {
-//       curpos = 0;
-//     }
-//     if (curpos == endFrame) {
-//       break;
-//     }
-//   }
+  utils.meanNormalize(image);
+  //utils.standardize(image);
 
-//   // post loudness calculation
-//   // calculate loudness an time series between start and endframe
-//   let loudness = loudnessSample.calculateLoudness([].concat.apply([], timeseries));
-//   let dB = loudness - targetLKFS;
-//   let targetGain = 1;
-//   if (loudness > LKFS_THRESHOLD) {
-//     targetGain = 1 / Math.pow(10, dB / 20);
-//   }
-//   console.log(loudness, targetGain);
+  //let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
+  let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_DCT, 1]);
 
-//   // post DFT
-//   let image_adapted = [];
-//   for (let idx = 0; idx < timeseries.length; idx++) {
-//     // scale to target loudness
-//     let timeseries_adapted = timeseries[idx].map((ts) => targetGain * ts);
+  model
+    .predict(x)
+    .data()
+    .then((result) => {
+      showPrediction(result);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+}
 
-//     // Do the Fourier Transformation
-//     dft.forward(timeseries_adapted);
-//     utils.assert(B2P1 == dft.mag.length);
+function showPrediction(result) {
+  utils.assert(result.length == inputs.length);
 
-//     // Copy array of mel coefficients
-//     let tmp = filter.getLogMelCoefficients(dft.mag, MIN_EXP, MAX_EXP);
-//     image_adapted.push(
-//       tmp.map((m) => {
-//         return utils.map(m, 0, 255, 1, -1);
-//       })
-//     );
-//   }
+  const maxIdx = utils.indexOfMax(result);
 
-//   //let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
-//   let x = tf.tensor2d(image_adapted).reshape([1, RECORDBUFFER, nMelFilter, 1]);
+  let list = document.getElementById('result');
+  list.innerHTML = '';
 
-//   model
-//     .predict(x)
-//     .data()
-//     .then((result) => {
-//       showPrediction(result);
-//     })
-//     .catch((err) => {
-//       console.log(err);
-//     });
-// }
+  for (let idx = 0; idx < result.length; idx++) {
+    let entry = document.createElement('li');
+    let span = document.createElement('span');
+    let textNode = document.createTextNode(`${inputs[idx].label}: ${result[idx].toFixed(2)}`);
+    if (idx == maxIdx) {
+      span.style.color = 'red';
+    }
+    span.appendChild(textNode);
+    entry.appendChild(span);
+    list.appendChild(entry);
+  }
 
-// function showPrediction(result) {
-//   utils.assert(result.length == inputs.length);
+  //
+  const TRESHOLD = 0.9;
+  if (result[maxIdx] > TRESHOLD && maxIdx != 0) {
+    let div = document.getElementById('topresult');
+    div.innerHTML = '';
+    let entry = document.createElement('p');
+    let span = document.createElement('span');
+    let textNode;
+    textNode = document.createTextNode(
+      `last recognized class (threshold>${TRESHOLD}) except class1: ${inputs[maxIdx].label}`
+    );
+    span.appendChild(textNode);
+    entry.appendChild(span);
+    div.appendChild(entry);
+  }
+}
 
-//   const maxIdx = utils.indexOfMax(result);
-
-//   let list = document.getElementById('result');
-//   list.innerHTML = '';
-
-//   for (let idx = 0; idx < result.length; idx++) {
-//     let entry = document.createElement('li');
-//     let span = document.createElement('span');
-//     let textNode = document.createTextNode(`${inputs[idx].label}: ${result[idx].toFixed(2)}`);
-//     if (idx == maxIdx) {
-//       span.style.color = 'red';
-//     }
-//     span.appendChild(textNode);
-//     entry.appendChild(span);
-//     list.appendChild(entry);
-//   }
-
-//   //
-//   const TRESHOLD = 0.9;
-//   if (result[maxIdx] > TRESHOLD && maxIdx != 0) {
-//     let div = document.getElementById('topresult');
-//     div.innerHTML = '';
-//     let entry = document.createElement('p');
-//     let span = document.createElement('span');
-//     let textNode;
-//     textNode = document.createTextNode(
-//       `last recognized class (threshold>${TRESHOLD}) except class1: ${inputs[maxIdx].label}`
-//     );
-//     span.appendChild(textNode);
-//     entry.appendChild(span);
-//     div.appendChild(entry);
-//   }
-// }
-
-// predict_btn.addEventListener('click', () => {
-//   const INTERVALL = 500; //predict every XXX ms
-//   setInterval(() => {
-//     tf.tidy(() => {
-//       predict(SERIES_POS);
-//     });
-//   }, INTERVALL);
-// });
+predict_btn.addEventListener('click', () => {
+  const INTERVALL = 500; //predict every XXX ms
+  setInterval(() => {
+    tf.tidy(() => {
+      predict(Data_Pos);
+    });
+  }, INTERVALL);
+});
 
 // who understands what is happening here, feel free to explain it to me :)
 function transpose(a) {
-  return a[0].map((_, c) => a.map((r) => utils.map(r[c], -1, 1, 0, 255)));
+  return a[0].map((_, c) => a.map((r) => utils.rangeMap(r[c], -2, 2, 0, 255)));
 }
 
 showImages_btn.addEventListener('click', async () => {
@@ -689,59 +664,59 @@ showImages_btn.addEventListener('click', async () => {
   }
 });
 
-// const save_btn = document.getElementById('save_btn');
-// save_btn.addEventListener('click', () => {
-//   Store.saveData(inputs, 'data');
-// });
+const save_btn = document.getElementById('save_btn');
+save_btn.addEventListener('click', () => {
+  Store.saveData(inputs, 'data');
+});
 
-// const load_btn = document.getElementById('load_btn');
-// load_btn.addEventListener('click', () => {
-//   inputs = Store.getData('data');
-// });
+const load_btn = document.getElementById('load_btn');
+load_btn.addEventListener('click', () => {
+  inputs = Store.getData('data');
+});
 
-// /**
-//  * Accuracy and Confusion Matrix
-//  */
-// let classNames = [];
+/**
+ * Accuracy and Confusion Matrix
+ */
+let classNames = [];
 
-// for (let idx = 0; idx < inputs.length; idx++) {
-//   classNames.push(inputs[idx].label);
-// }
+for (let idx = 0; idx < inputs.length; idx++) {
+  classNames.push(inputs[idx].label);
+}
 
-// function doPrediction() {
-//   const data = createData();
-//   const testxs = data.xs();
-//   const labels = data.ys().argMax([-1]);
-//   const preds = model.predict(testxs).argMax([-1]);
-//   testxs.dispose();
-//   return [preds, labels];
-// }
+function doPrediction() {
+  const data = createData();
+  const testxs = data.xs();
+  const labels = data.ys().argMax([-1]);
+  const preds = model.predict(testxs).argMax([-1]);
+  testxs.dispose();
+  return [preds, labels];
+}
 
-// async function showAccuracy() {
-//   const [preds, labels] = doPrediction();
+async function showAccuracy() {
+  const [preds, labels] = doPrediction();
 
-//   const classAccuracy = await tfvis.metrics.perClassAccuracy(labels, preds);
-//   const container = {
-//     name: 'Accuracy',
-//     tab: 'Evaluation',
-//   };
-//   tfvis.show.perClassAccuracy(container, classAccuracy, classNames);
-//   labels.dispose();
-// }
+  const classAccuracy = await tfvis.metrics.perClassAccuracy(labels, preds);
+  const container = {
+    name: 'Accuracy',
+    tab: 'Evaluation',
+  };
+  tfvis.show.perClassAccuracy(container, classAccuracy, classNames);
+  labels.dispose();
+}
 
-// async function showConfusion() {
-//   const [preds, labels] = doPrediction();
-//   const confusionMatrix = await tfvis.metrics.confusionMatrix(labels, preds);
-//   const container = {
-//     name: 'Confusion Matrix',
-//     tab: 'Evaluation',
-//   };
-//   tfvis.render.confusionMatrix(container, {
-//     values: confusionMatrix,
-//     tickLabels: classNames,
-//   });
-//   labels.dispose();
-// }
+async function showConfusion() {
+  const [preds, labels] = doPrediction();
+  const confusionMatrix = await tfvis.metrics.confusionMatrix(labels, preds);
+  const container = {
+    name: 'Confusion Matrix',
+    tab: 'Evaluation',
+  };
+  tfvis.render.confusionMatrix(container, {
+    values: confusionMatrix,
+    tickLabels: classNames,
+  });
+  labels.dispose();
+}
 
-// document.querySelector('#show-accuracy').addEventListener('click', () => showAccuracy());
-// document.querySelector('#show-confusion').addEventListener('click', () => showConfusion());
+document.querySelector('#show-accuracy').addEventListener('click', () => showAccuracy());
+document.querySelector('#show-confusion').addEventListener('click', () => showConfusion());

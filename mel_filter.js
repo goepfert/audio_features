@@ -86,7 +86,7 @@ let mel_filter = function () {
   }
 
   function getMelCoefficient(mIdx, buffer) {
-    utils.assert(_Hm[mIdx].length == buffer.length);
+    utils.assert(_Hm[mIdx].length == buffer.length, `${_Hm[mIdx].length}, ${buffer.length}`);
 
     let coeff = 0;
     for (let idx = 0; idx < buffer.length; idx++) {
