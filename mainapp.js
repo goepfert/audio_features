@@ -4,7 +4,7 @@ const samplerate = context.sampleRate;
 
 // Buffer sizes
 const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the mic)
-const FRAME_SIZE = 2048; // samplerate * 0.025; // Frame_time == 25 ms
+const FRAME_SIZE = samplerate * 0.025; // Frame_time == 25 ms
 const FRAME_STRIDE = samplerate * 0.01; // Frame_stride == 10 ms (=> 15 ms overlap)
 
 const buffertime = 1; // in seconds
@@ -33,8 +33,8 @@ const LKFS_THRESHOLD = -25; // don't scale if LKFS is below this threshold
 const fenster = createWindowing(FRAME_SIZE); // don't call it window ...
 
 // DFT
-//const dft = new DFT(FRAME_SIZE);
-const fft = new FFT(FRAME_SIZE, samplerate);
+const dft = new DFT(FRAME_SIZE);
+const fft = createFFT(FRAME_SIZE);
 const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 
 // Mel Filter
@@ -60,7 +60,7 @@ let ENDFRAME; // Recording Endframe (used for drawing)
 
 // Other
 const MIN_EXP = -1; // 10^{min_exp} linear, log scale minimum
-const MAX_EXP = 2; // 10^{max_exp} linear, log scale max
+const MAX_EXP = 3; // 10^{max_exp} linear, log scale max
 
 // Prefill arrays
 for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
@@ -186,36 +186,33 @@ function doFraming() {
     fenster.hamming(frame_buffer);
 
     // Fourier Transform
+    const mag = fft.getPowerspectrum(frame_buffer);
     //dft.forward(frame_buffer);
-    fft.forward(frame_buffer);
-    let spec = fft.spectrum;
-    for (let idx = 0; idx < spec.length; idx++) {
-      spec[idx] = (spec[idx] * FRAME_SIZE) / 2;
-    }
+    //const mag = dft.mag;
 
-    // mag_min = Math.min(...dft.mag);
+    // mag_min = Math.min(...mag);
     // _mag_min = mag_min < _mag_min ? mag_min : _mag_min;
-    // mag_max = Math.max(...dft.mag);
+    // mag_max = Math.max(...mag);
     // _mag_max = mag_max > _mag_max ? mag_max : _mag_max;
-    DFT_Data[Data_Pos] = utils.logRangeMapBuffer(spec, MIN_EXP, MAX_EXP, 255, 0);
+    DFT_Data[Data_Pos] = utils.logRangeMapBuffer(mag, MIN_EXP, MAX_EXP, 255, 0);
 
     // MelFilter;
-    let mel_array = filter.getLogMelCoefficients(spec);
+    let mel_array = filter.getLogMelCoefficients(mag);
     // mel_min = Math.min(...mel_array);
     // _mel_min = mel_min < _mel_min ? mel_min : _mel_min;
     // mel_max = Math.max(...mel_array);
     // _mel_max = mel_max > _mel_max ? mel_max : _mel_max;
-    //LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
+    LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
 
     // Discrete Cosine Transform
-    // fastDctLee.transform(mel_array);
-    // let dct_array = mel_array.slice(1, 1 + N_DCT);
-    // // dct_min = Math.min(...dct_array);
-    // // _dct_min = dct_min < _dct_min ? dct_min : _dct_min;
-    // // dct_max = Math.max(...dct_array);
-    // // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
-    // DCT_RAW[Data_Pos] = Array.from(dct_array);
-    // DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -20, 20, 255, 0);
+    fastDctLee.transform(mel_array);
+    let dct_array = mel_array.slice(1, 1 + N_DCT);
+    // dct_min = Math.min(...dct_array);
+    // _dct_min = dct_min < _dct_min ? dct_min : _dct_min;
+    // dct_max = Math.max(...dct_array);
+    // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
+    DCT_RAW[Data_Pos] = Array.from(dct_array);
+    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -20, 20, 255, 0);
 
     // Bookeeping
     Data_Pos = (Data_Pos + 1) % RB_SIZE_FRAMING;
@@ -226,9 +223,9 @@ function doFraming() {
   nextStartPos = startPos;
   // console.log('nFrames', nFrames, 'nextStartPos', nextStartPos);
 
-  //console.log('mel', _mag_min, _mag_max); // 0 ... 100
-  //console.log('mel', _mel_min, _mel_max); // 0 ... 2
-  //console.log('dct', _dct_min, _dct_max); // -20 ... 25
+  // console.log('mag', _mag_min, _mag_max); // 0 ... 100 (powerspec 0 ... 10000)
+  // console.log('mel', _mel_min, _mel_max); // 0 ... 2
+  // console.log('dct', _dct_min, _dct_max); // -20 ... 25
 }
 
 /**
