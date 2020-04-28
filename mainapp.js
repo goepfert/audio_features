@@ -1,5 +1,6 @@
 // It all starts with a context
-const context = new AudioContext({ samplerate: 16000 });
+//const context = new AudioContext({ samplerate: 48000 });
+const context = new AudioContext();
 const samplerate = context.sampleRate;
 
 // Buffer sizes
@@ -8,10 +9,10 @@ const FRAME_SIZE = samplerate * 0.025; // Frame_time == 25 ms
 const FRAME_STRIDE = samplerate * 0.01; // Frame_stride == 10 ms (=> 15 ms overlap)
 
 const buffertime = 1; // in seconds
-const RECORD_SIZE = Math.floor((samplerate * buffertime) / BUFFER_SIZE) * BUFFER_SIZE; // ~buffertime in number of samples, ensure integer fraction size
+const RECORD_SIZE = Math.floor((samplerate * buffertime) / BUFFER_SIZE) * BUFFER_SIZE; // ~buffertime in number of samples, ensure integer fraction size of concat
 
 // Ringbuffer Time Domain (1D)
-const RB_SIZE = 1.5 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE
+const RB_SIZE = 2 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE and integer fraction of BUFFER_SIZE
 //const timeDomainData = Array.from(Array(RB_SIZE), () => 0);
 const timeDomainData = new CircularBuffer(RB_SIZE);
 
@@ -38,27 +39,25 @@ const fft = createFFT(FRAME_SIZE);
 const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 
 // Mel Filter
-const N_MEL_FILTER = 32; // Number of Mel Filterbanks
+const N_MEL_FILTER = 32; // Number of Mel Filterbanks (power of 2)
 const filter = mel_filter();
 const MIN_FREQUENCY = 300; // lower end of first mel filter bank
 const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
 filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 
 // DCT
-const N_DCT = 12; // discard first and keep second undtil you have N_DCT
+const N_DCT = 12; // discard first and keep second until you have N_DCT
 
 // Neural Network
 const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
 let nn; // defined later
 let model;
 
-console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT);
+//console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
 
 // Plotting
 let STARTFRAME; // Recording Startframe (used for drawing)
 let ENDFRAME; // Recording Endframe (used for drawing)
-
-// Other
 const MIN_EXP = -1; // 10^{min_exp} linear, log scale minimum
 const MAX_EXP = 3; // 10^{max_exp} linear, log scale max
 
@@ -212,7 +211,7 @@ function doFraming() {
     // dct_max = Math.max(...dct_array);
     // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
     DCT_RAW[Data_Pos] = Array.from(dct_array);
-    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -30, 20, 255, 0);
+    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -30, 30, 255, 0);
 
     // Bookeeping
     Data_Pos = (Data_Pos + 1) % RB_SIZE_FRAMING;
@@ -222,7 +221,6 @@ function doFraming() {
 
   nextStartPos = startPos;
   // console.log('nFrames', nFrames, 'nextStartPos', nextStartPos);
-
   // console.log('mag', _mag_min, _mag_max); // 0 ... 100 (powerspec 0 ... 10000)
   // console.log('mel', _mel_min, _mel_max); // 0 ... 2
   // console.log('dct', _dct_min, _dct_max); // -20 ... 25
@@ -396,11 +394,7 @@ const showImages_btn = document.getElementById('showImages_btn');
 toggleButtons(false);
 
 /**
- * extract snapshot of RECORDTIME from ringbuffer
- * calculate loudness of snapshot
- * scale timeseries with gain correction (to given loudness)
- * apply dft on adated timeseries (-> hope this makes some sense to do it this way)
- * image[] contains the 'raw' mel filter 2d array
+ * extract snapshot of RECORDTIME from raw dct ringbuffer
  */
 function record(e, label) {
   //let endFrame = SERIES_POS;
@@ -673,15 +667,6 @@ load_btn.addEventListener('click', () => {
   inputs = Store.getData('data');
 });
 
-/**
- * Accuracy and Confusion Matrix
- */
-let classNames = [];
-
-for (let idx = 0; idx < inputs.length; idx++) {
-  classNames.push(inputs[idx].label);
-}
-
 function doPrediction() {
   const data = createData();
   const testxs = data.xs();
@@ -689,6 +674,15 @@ function doPrediction() {
   const preds = model.predict(testxs).argMax([-1]);
   testxs.dispose();
   return [preds, labels];
+}
+
+/**
+ * Accuracy and Confusion Matrix
+ */
+let classNames = [];
+
+for (let idx = 0; idx < inputs.length; idx++) {
+  classNames.push(inputs[idx].label);
 }
 
 async function showAccuracy() {

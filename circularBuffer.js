@@ -20,6 +20,8 @@ class CircularBuffer {
   validate(buffer) {
     if (!this.isBuffer(buffer)) {
       console.log(buffer);
+      console.log('length', this.length);
+      console.log('buffer.length', buffer.length);
       throw new Error('Argument should be an AudioBuffer instance and comply with some assumptions');
     }
   }
