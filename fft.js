@@ -28,7 +28,12 @@
  * The vector can have any length. This is a wrapper function.
  */
 
-function createFFT(bufferSize) {
+function createFFT() {
+
+  (function init() {
+    // TODO: think about precalculting cos/sin tables for n (power of 2) and m
+  })();
+
   function transform(real, imag) {
     var n = real.length;
     if (n != imag.length) throw 'Mismatched lengths';

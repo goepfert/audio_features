@@ -1,6 +1,8 @@
 /**
- * number found around the web
+ * numbers found around the web
  * can be generalized for other windowing functions
+ * 
+ * implace
  */
 
 function createWindowing(length) {

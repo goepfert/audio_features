@@ -212,7 +212,7 @@ function doFraming() {
     // dct_max = Math.max(...dct_array);
     // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
     DCT_RAW[Data_Pos] = Array.from(dct_array);
-    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -20, 20, 255, 0);
+    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -30, 20, 255, 0);
 
     // Bookeeping
     Data_Pos = (Data_Pos + 1) % RB_SIZE_FRAMING;
@@ -362,7 +362,7 @@ const draw = function () {
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 50);
+  }, 100);
 }; // end draw fcn
 
 draw();
@@ -420,7 +420,8 @@ function record(e, label) {
     }
   }
 
-  // TODO:
+  // TODO: what is 'better' meanNormalize or standardize?
+  // !!! check also predict
   utils.meanNormalize(image);
   //utils.standardize(image);
 
@@ -567,6 +568,7 @@ function predict(endFrame) {
     }
   }
 
+  // check which what option the nn was trained!
   utils.meanNormalize(image);
   //utils.standardize(image);
 
