@@ -25,16 +25,10 @@ const LOG_MEL = []; // log mel filter coefficients
 const DCT_RAW = []; // dct -> to be mean normalized
 const DCT = []; // dct range map
 
-// Loudness
-const loudnessSample = new LoudnessSample(samplerate);
-const targetLKFS = -13; // the target loudness
-const LKFS_THRESHOLD = -25; // don't scale if LKFS is below this threshold
-
 // Hamming Window
 const fenster = createWindowing(FRAME_SIZE); // don't call it window ...
 
 // DFT
-const dft = new DFT(FRAME_SIZE);
 const fft = createFFT(FRAME_SIZE);
 const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 
@@ -421,6 +415,12 @@ function record(e, label) {
 
   let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
+
+  for(let idx=0; idx<1; idx++) {
+    let augImg = createImage(image, 0.30);
+    //inputs[index].data.push(augImg);
+  }
+
   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
   console.log('recording finished');
   toggleButtons(false);
