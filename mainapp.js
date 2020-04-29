@@ -42,6 +42,10 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 // DCT
 const N_DCT = 12; // discard first and keep second until you have N_DCT
 
+// Data augmentation
+const N_AUG = 4;
+const FRACTION = 0.3;
+
 // Neural Network
 const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
 let nn; // defined later
@@ -68,7 +72,7 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
 }
 
 // Canvas width and height
-let drawit = [true, false, true, true];
+let drawit = [false, false, true, true];
 
 const w = RB_SIZE_FRAMING;
 const h = 100; //N_MEL_FILTER;
@@ -410,15 +414,15 @@ function record(e, label) {
 
   // TODO: what is 'better' meanNormalize or standardize?
   // !!! check also predict
-  utils.meanNormalize(image);
-  //utils.standardize(image);
+  //utils.meanNormalize(image);
+  utils.standardize(image);
 
   let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
 
-  for(let idx=0; idx<1; idx++) {
-    let augImg = createImage(image, 0.30);
-    //inputs[index].data.push(augImg);
+  for (let idx = 0; idx < N_AUG; idx++) {
+    let augImg = createImage(image, FRACTION);
+    inputs[index].data.push(augImg);
   }
 
   e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
@@ -551,7 +555,7 @@ function predict(endFrame) {
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    image[idx] = Array.from(DCT_RAW[idx]);
+    image[idx] = Array.from(DCT_RAW[curpos]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -563,10 +567,9 @@ function predict(endFrame) {
   }
 
   // check which what option the nn was trained!
-  utils.meanNormalize(image);
-  //utils.standardize(image);
+  //utils.meanNormalize(image);
+  utils.standardize(image);
 
-  //let x = tf.tensor2d(image).reshape([1, RECORDBUFFER, nMelFilter, 1]);
   let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_DCT, 1]);
 
   model

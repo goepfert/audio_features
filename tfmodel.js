@@ -20,9 +20,9 @@ function createNetwork(width, height, nClasses) {
         inputShape: [IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS],
         dataFormat: 'channelsLast',
         kernelSize: [2, 2],
-        padding: 'same',
+        padding: 'same', // TODO: check influence
         filters: 8,
-        strides: 1,
+        strides: [1, 1],
         activation: 'relu',
         kernelInitializer: 'varianceScaling',
       })
@@ -31,7 +31,7 @@ function createNetwork(width, height, nClasses) {
     model.add(
       tf.layers.conv2d({
         kernelSize: [2, 2],
-        filters: 16,
+        filters: 32,
         strides: 1,
         activation: 'relu',
         kernelInitializer: 'varianceScaling',
@@ -41,7 +41,7 @@ function createNetwork(width, height, nClasses) {
     // model.add(
     //   tf.layers.conv2d({
     //     kernelSize: [2, 2],
-    //     filters: 16,
+    //     filters: 32,
     //     strides: 1,
     //     activation: 'relu',
     //     kernelInitializer: 'varianceScaling',
@@ -50,20 +50,20 @@ function createNetwork(width, height, nClasses) {
     // model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
     // model.add(
     //   tf.layers.conv2d({
-    //     kernelSize: [4, 2],
+    //     kernelSize: [2, 2],
     //     filters: 32,
-    //     strides: 1,
+    //     strides: 2,
     //     activation: 'relu',
     //     kernelInitializer: 'varianceScaling',
     //   })
     // );
-    // model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
+    // // model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
 
     model.add(tf.layers.flatten());
     model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
-        units: 1000,
+        units: 500,
         activation: 'relu',
       })
     );

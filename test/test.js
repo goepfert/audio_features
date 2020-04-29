@@ -1,19 +1,10 @@
-let buffer2D = [];
+let b = [
+  [1, 2],
+  [3, 4],
+  [5, 6],
+  [7, 8],
+];
 
-const nRow = 5;
-const nCol = 5;
+console.table(b);
 
-for (let row = 0; row < nRow; row++) {
-  let data = [];
-  for (let col = 0; col < nCol; col++) {
-    data.push(Math.random() * 1);
-  }
-  buffer2D.push(data);
-}
-
-console.table(buffer2D);
-let cpy = Array.from(buffer2D);
-utils.meanNormalize(cpy);
-console.table(cpy);
-utils.standardize(buffer2D);
-console.table(buffer2D);
+console.table(createImage(b, 0.5));

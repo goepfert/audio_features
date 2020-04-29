@@ -1,34 +1,33 @@
+/**
+ * create a new image based on an 2d array
+ * cutoff some fraction from left or right side and fill the other side with zeros
+ */
+
+'use strict';
+
 function createImage(buffer, fraction) {
+  const nRow = buffer.length;
+  let nCol = buffer[0].length;
+  let cutoff = nRow * fraction;
+  cutoff = Math.round(Math.random() * Math.round(cutoff));
 
-    const nRow = buffer.length;
-    let nCol = buffer[0].length;
-    let cutoff = nRow * fraction;
-    cutoff = Math.round(Math.random() * Math.round(cutoff));
-    console.log(nRow, nCol, cutoff);
+  let newImage = [];
 
-    let newBuffer = [];
+  //left or right cutoff
+  const lr = Math.random();
+  if (lr < 0.5) {
+    newImage = buffer.slice(0, nRow - cutoff);
+    let zero = createZeroBuffer(cutoff, nCol);
+    newImage = zero.concat(newImage);
+  } else {
+    newImage = buffer.slice(cutoff, nRow);
+    let zero = createZeroBuffer(cutoff, nCol);
+    newImage = newImage.concat(zero);
+  }
 
-    //left/right
-    const lr = Math.random();
-    if (lr < 0.5) {
+  return newImage;
 
-        console.table(buffer);
-        newBuffer = buffer.slice(0, nRow - cutoff);
-        console.log(newBuffer);
-        let zero = Array.from(Array(cutoff), () => Array.from(Array(nCol), ()=>0) );
-        console.log(zero);
-        newBuffer = zero.concat(newBuffer);
-        console.table(newBuffer);
-    } else {
-
-        console.log('----------');
-
-        console.table(buffer);
-        newBuffer = buffer.slice(cutoff, nRow);
-        console.log(newBuffer);
-        let zero = Array.from(Array(cutoff), () => Array.from(Array(nCol), ()=>0) );
-        console.log(zero);
-        newBuffer = newBuffer.concat(zero);
-        console.table(newBuffer);
-    }
+  function createZeroBuffer(nRows, nCols) {
+    return Array.from(Array(nRows), () => Array.from(Array(nCols), () => 0));
+  }
 }
