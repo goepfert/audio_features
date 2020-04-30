@@ -20,7 +20,7 @@ function createNetwork(width, height, nClasses) {
         inputShape: [IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS],
         dataFormat: 'channelsLast',
         kernelSize: [2, 2],
-        padding: 'same', // TODO: check influence
+        //padding: 'same', // TODO: check influence
         filters: 8,
         strides: [1, 1],
         activation: 'relu',

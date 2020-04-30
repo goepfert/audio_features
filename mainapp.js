@@ -21,6 +21,7 @@ const RB_SIZE_FRAMING = utils.getNumberOfFrames(RB_SIZE, FRAME_SIZE, FRAME_STRID
 const RECORD_SIZE_FRAMING = utils.getNumberOfFrames(RECORD_SIZE, FRAME_SIZE, FRAME_STRIDE); // number of frames in record
 let Data_Pos = 0;
 const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
+const LOG_MEL_RAW = []; // log mel filter coefficients
 const LOG_MEL = []; // log mel filter coefficients
 const DCT_RAW = []; // dct -> to be mean normalized
 const DCT = []; // dct range map
@@ -33,7 +34,7 @@ const fft = createFFT(FRAME_SIZE);
 const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 
 // Mel Filter
-const N_MEL_FILTER = 32; // Number of Mel Filterbanks (power of 2)
+const N_MEL_FILTER = 40; // Number of Mel Filterbanks (power of 2 for DCT)
 const filter = mel_filter();
 const MIN_FREQUENCY = 300; // lower end of first mel filter bank
 const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
@@ -43,7 +44,7 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 const N_DCT = 12; // discard first and keep second until you have N_DCT
 
 // Data augmentation
-const N_AUG = 4;
+const N_AUG = 0;
 const FRACTION = 0.3;
 
 // Neural Network
@@ -64,15 +65,21 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
   let ft_array = Array.from(Array(B2P1), () => 0);
   DFT_Data.push(ft_array);
 
+  let mel_raw_array = Array.from(Array(N_MEL_FILTER), () => 0);
+  LOG_MEL_RAW.push(mel_raw_array);
+
   let mel_array = Array.from(Array(N_MEL_FILTER), () => 0);
   LOG_MEL.push(mel_array);
+
+  let dct_raw_array = Array.from(Array(N_DCT), () => 0);
+  DCT_RAW.push(dct_raw_array);
 
   let dct_array = Array.from(Array(N_DCT), () => 0);
   DCT.push(dct_array);
 }
 
 // Canvas width and height
-let drawit = [false, false, true, true];
+let drawit = [false, false, true, false];
 
 const w = RB_SIZE_FRAMING;
 const h = 100; //N_MEL_FILTER;
@@ -199,17 +206,18 @@ function doFraming() {
     // _mel_min = mel_min < _mel_min ? mel_min : _mel_min;
     // mel_max = Math.max(...mel_array);
     // _mel_max = mel_max > _mel_max ? mel_max : _mel_max;
+    LOG_MEL_RAW[Data_Pos] = Array.from(mel_array);
     LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
 
     // Discrete Cosine Transform
-    fastDctLee.transform(mel_array);
-    let dct_array = mel_array.slice(1, 1 + N_DCT);
+    //fastDctLee.transform(mel_array);
+    //let dct_array = mel_array.slice(1, 1 + N_DCT);
     // dct_min = Math.min(...dct_array);
     // _dct_min = dct_min < _dct_min ? dct_min : _dct_min;
     // dct_max = Math.max(...dct_array);
     // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
-    DCT_RAW[Data_Pos] = Array.from(dct_array);
-    DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -30, 30, 255, 0);
+    //DCT_RAW[Data_Pos] = Array.from(dct_array);
+    //DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -30, 30, 255, 0);
 
     // Bookeeping
     Data_Pos = (Data_Pos + 1) % RB_SIZE_FRAMING;
@@ -358,7 +366,7 @@ const draw = function () {
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 100);
+  }, 200);
 }; // end draw fcn
 
 draw();
@@ -401,7 +409,8 @@ function record(e, label) {
   let curpos = STARTFRAME;
 
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    image[idx] = Array.from(DCT_RAW[idx]);
+    //image[idx] = Array.from(DCT_RAW[idx]);
+    image[idx] = Array.from(LOG_MEL_RAW[idx]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -414,8 +423,8 @@ function record(e, label) {
 
   // TODO: what is 'better' meanNormalize or standardize?
   // !!! check also predict
-  //utils.meanNormalize(image);
-  utils.standardize(image);
+  utils.meanNormalize(image);
+  //utils.standardize(image);
 
   let index = inputs.findIndex((input) => input.label == label);
   inputs[index].data.push(image);
@@ -512,7 +521,7 @@ function createData() {
 
   function getXs() {
     let xs = tf.tensor3d(_xData);
-    xs = xs.reshape([_dataSize, RECORD_SIZE_FRAMING, N_DCT, 1]);
+    xs = xs.reshape([_dataSize, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
     return xs;
   }
 
@@ -534,7 +543,7 @@ function createData() {
  */
 train_btn.addEventListener('click', async () => {
   toggleButtons(true);
-  nn = createNetwork(RECORD_SIZE_FRAMING, N_DCT, inputs.length);
+  nn = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, inputs.length);
   model = nn.getModel();
   tfvis.show.modelSummary({ name: 'Model Summary' }, model);
   const data = createData();
@@ -555,7 +564,8 @@ function predict(endFrame) {
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    image[idx] = Array.from(DCT_RAW[curpos]);
+    //image[idx] = Array.from(DCT_RAW[curpos]);
+    image[idx] = Array.from(LOG_MEL_RAW[curpos]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -567,10 +577,10 @@ function predict(endFrame) {
   }
 
   // check which what option the nn was trained!
-  //utils.meanNormalize(image);
-  utils.standardize(image);
+  utils.meanNormalize(image);
+  //utils.standardize(image);
 
-  let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_DCT, 1]);
+  let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
 
   model
     .predict(x)
@@ -631,7 +641,7 @@ predict_btn.addEventListener('click', () => {
 
 // who understands what is happening here, feel free to explain it to me :)
 function transpose(a) {
-  return a[0].map((_, c) => a.map((r) => utils.rangeMap(r[c], -2, 2, 0, 255)));
+  return a[0].map((_, c) => a.map((r) => utils.rangeMap(r[c], -1, 1, 0, 255)));
 }
 
 showImages_btn.addEventListener('click', async () => {
@@ -652,7 +662,7 @@ showImages_btn.addEventListener('click', async () => {
       }
       const canvas = document.createElement('canvas');
       canvas.width = RECORD_SIZE_FRAMING + 2;
-      canvas.height = N_DCT + 2;
+      canvas.height = N_MEL_FILTER + 2;
       canvas.style = 'margin: 1px; border: solid 1px';
       await tf.browser.toPixels(transpose(inputs[classIdx].data[idx]).reverse(), canvas);
       drawArea.appendChild(canvas);
