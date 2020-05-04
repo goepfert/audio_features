@@ -6,9 +6,6 @@ let a = [
 ];
 
 console.table(a);
-
 const generator = createImageDataGenerator({ fill_mode: 'nearest' });
-
 let b = generator.horizontalShift(a, 0.5);
-
 console.table(b);

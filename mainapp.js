@@ -40,17 +40,21 @@ const MIN_FREQUENCY = 300; // lower end of first mel filter bank
 const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
 filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 
-// DCT
-const N_DCT = 12; // discard first and keep second until you have N_DCT
+// Dataset
+const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
+const dataset = createDataset(NCLASSES, 0.2); // validation split
+let trained_data = undefined;
 
 // Data augmentation
-const N_AUG = 0;
-const FRACTION = 0.3;
+const N_AUG = 3;
+const FRACTION = 0.1; // horizontal shift fraction
+const opt = { fill_mode: 'nearest' };
+const generator = createImageDataGenerator(opt);
 
 // Neural Network
-const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
 let nn; // defined later
 let model;
+const MEAN_NORMALIZE = true; // false -> standardize
 
 //console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
 
@@ -70,16 +74,10 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
 
   let mel_array = Array.from(Array(N_MEL_FILTER), () => 0);
   LOG_MEL.push(mel_array);
-
-  let dct_raw_array = Array.from(Array(N_DCT), () => 0);
-  DCT_RAW.push(dct_raw_array);
-
-  let dct_array = Array.from(Array(N_DCT), () => 0);
-  DCT.push(dct_array);
 }
 
 // Canvas width and height
-let drawit = [false, false, true, false];
+let drawit = [false, false, true];
 
 const w = RB_SIZE_FRAMING;
 const h = 100; //N_MEL_FILTER;
@@ -112,13 +110,6 @@ if (drawit[2]) {
   context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
   canvas_fftSeries_mel.width = 4 * w;
   canvas_fftSeries_mel.height = 4 * N_MEL_FILTER;
-}
-
-if (drawit[3]) {
-  canvas_fftSeries_dct = document.getElementById('fft-series dct');
-  context_fftSeries_dct = canvas_fftSeries_dct.getContext('2d');
-  canvas_fftSeries_dct.width = 4 * w;
-  canvas_fftSeries_dct.height = 4 * N_DCT;
 }
 
 /**
@@ -161,13 +152,6 @@ navigator.mediaDevices
   .catch((err) => console.log(err));
 
 let nextStartPos = 0;
-let _mag_min = 100;
-let _mag_max = 0;
-let _mel_min = 100;
-let _mel_max = 0;
-let _dct_min = 100;
-let _dct_max = 0;
-
 function doFraming() {
   let headPos = timeDomainData.getHeadPos();
   let availableData = headPos - nextStartPos;
@@ -191,33 +175,12 @@ function doFraming() {
 
     // Fourier Transform
     const mag = fft.getPowerspectrum(frame_buffer);
-    //dft.forward(frame_buffer);
-    //const mag = dft.mag;
-
-    // mag_min = Math.min(...mag);
-    // _mag_min = mag_min < _mag_min ? mag_min : _mag_min;
-    // mag_max = Math.max(...mag);
-    // _mag_max = mag_max > _mag_max ? mag_max : _mag_max;
     DFT_Data[Data_Pos] = utils.logRangeMapBuffer(mag, MIN_EXP, MAX_EXP, 255, 0);
 
     // MelFilter;
     let mel_array = filter.getLogMelCoefficients(mag);
-    // mel_min = Math.min(...mel_array);
-    // _mel_min = mel_min < _mel_min ? mel_min : _mel_min;
-    // mel_max = Math.max(...mel_array);
-    // _mel_max = mel_max > _mel_max ? mel_max : _mel_max;
     LOG_MEL_RAW[Data_Pos] = Array.from(mel_array);
     LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
-
-    // Discrete Cosine Transform
-    //fastDctLee.transform(mel_array);
-    //let dct_array = mel_array.slice(1, 1 + N_DCT);
-    // dct_min = Math.min(...dct_array);
-    // _dct_min = dct_min < _dct_min ? dct_min : _dct_min;
-    // dct_max = Math.max(...dct_array);
-    // _dct_max = dct_max > _dct_max ? dct_max : _dct_max;
-    //DCT_RAW[Data_Pos] = Array.from(dct_array);
-    //DCT[Data_Pos] = utils.rangeMapBuffer(dct_array, -30, 30, 255, 0);
 
     // Bookeeping
     Data_Pos = (Data_Pos + 1) % RB_SIZE_FRAMING;
@@ -226,10 +189,6 @@ function doFraming() {
   }
 
   nextStartPos = startPos;
-  // console.log('nFrames', nFrames, 'nextStartPos', nextStartPos);
-  // console.log('mag', _mag_min, _mag_max); // 0 ... 100 (powerspec 0 ... 10000)
-  // console.log('mel', _mel_min, _mel_max); // 0 ... 2
-  // console.log('dct', _dct_min, _dct_max); // -20 ... 25
 }
 
 /**
@@ -371,15 +330,9 @@ const draw = function () {
 
 draw();
 
-// Create Training Data and record buttons
-let inputs = []; // the recorded data
+// Create record buttons
 const record_btns_div = document.getElementById('record_btns');
 for (let idx = 0; idx < NCLASSES; idx++) {
-  inputs.push({
-    label: `class${idx + 1}`, // class label
-    data: [], // the unscaled dct image
-  });
-
   const btn = document.createElement('button');
   btn.classList.add('record_btn');
   btn.id = `class${idx + 1}`;
@@ -409,7 +362,6 @@ function record(e, label) {
   let curpos = STARTFRAME;
 
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    //image[idx] = Array.from(DCT_RAW[idx]);
     image[idx] = Array.from(LOG_MEL_RAW[idx]);
 
     curpos++;
@@ -422,19 +374,20 @@ function record(e, label) {
   }
 
   // TODO: what is 'better' meanNormalize or standardize?
-  // !!! check also predict
-  utils.meanNormalize(image);
-  //utils.standardize(image);
-
-  let index = inputs.findIndex((input) => input.label == label);
-  inputs[index].data.push(image);
-
-  for (let idx = 0; idx < N_AUG; idx++) {
-    let augImg = createImage(image, FRACTION);
-    inputs[index].data.push(augImg);
+  if (MEAN_NORMALIZE) {
+    utils.meanNormalize(image);
+  } else {
+    utils.standardize(image);
   }
 
-  e.target.labels[0].innerHTML = `${inputs[index].data.length}`;
+  dataset.addImage(image, label);
+
+  for (let idx = 0; idx < N_AUG; idx++) {
+    let augImg = generator.horizontalShift(image, FRACTION);
+    dataset.addImage(augImg, label);
+  }
+
+  e.target.labels[0].innerHTML = `${dataset.getNumImages(label)}`;
   console.log('recording finished');
   toggleButtons(false);
 } // end recording
@@ -471,92 +424,25 @@ function toggleButtons(flag) {
 }
 
 /**
- * convert data to tensors
- */
-function createData() {
-  let _labelList = [];
-  let _xData = [];
-  let _yData = [];
-  let _dataSize = 0;
-
-  function createLabelList() {
-    let nLabels = inputs.length;
-    for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
-      _labelList.push(inputs[dataIdx].label);
-    }
-  }
-
-  function shuffle(obj1, obj2) {
-    let index = obj1.length;
-    let rnd, tmp1, tmp2;
-
-    while (index) {
-      rnd = Math.floor(Math.random() * index);
-      index -= 1;
-      tmp1 = obj1[index];
-      tmp2 = obj2[index];
-      obj1[index] = obj1[rnd];
-      obj2[index] = obj2[rnd];
-      obj1[rnd] = tmp1;
-      obj2[rnd] = tmp2;
-    }
-  }
-
-  (function convertData() {
-    createLabelList();
-
-    let nLabels = inputs.length;
-    _xData = [];
-    _yData = [];
-    for (let dataIdx = 0; dataIdx < nLabels; dataIdx++) {
-      for (let idx = 0; idx < inputs[dataIdx].data.length; idx++) {
-        _xData.push(inputs[dataIdx].data[idx]);
-        _yData.push(_labelList.indexOf(inputs[dataIdx].label));
-        _dataSize++;
-      }
-    }
-
-    shuffle(_xData, _yData);
-  })();
-
-  function getXs() {
-    let xs = tf.tensor3d(_xData);
-    xs = xs.reshape([_dataSize, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
-    return xs;
-  }
-
-  function getYs() {
-    let labelstensor = tf.tensor1d(_yData, 'int32');
-    let ys = tf.oneHot(labelstensor, inputs.length);
-    labelstensor.dispose();
-    return ys;
-  }
-
-  return {
-    xs: getXs,
-    ys: getYs,
-  };
-}
-
-/**
  * Create Network and attach training to training button
  */
 train_btn.addEventListener('click', async () => {
   toggleButtons(true);
-  nn = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, inputs.length);
+  nn = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, NCLASSES);
   model = nn.getModel();
   tfvis.show.modelSummary({ name: 'Model Summary' }, model);
-  const data = createData();
-  await nn.train(data.xs(), data.ys(), model);
+  trained_data = dataset.getData();
+  await nn.train(trained_data.x, trained_data.y, model);
   console.log('training finished');
+
   togglePredictButton(false);
+  //TODO: toggleAccuracy
 });
 
 /**
  * Predict section
  */
 function predict(endFrame) {
-  //let startFrame = (endFrame - RECORDBUFFER) % FRAMESIZE;
   let startFrame = (endFrame - RECORD_SIZE_FRAMING) % RB_SIZE_FRAMING;
   if (startFrame < 0) {
     startFrame = RECORD_SIZE_FRAMING + startFrame;
@@ -564,7 +450,6 @@ function predict(endFrame) {
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    //image[idx] = Array.from(DCT_RAW[curpos]);
     image[idx] = Array.from(LOG_MEL_RAW[curpos]);
 
     curpos++;
@@ -577,8 +462,11 @@ function predict(endFrame) {
   }
 
   // check which what option the nn was trained!
-  utils.meanNormalize(image);
-  //utils.standardize(image);
+  if (MEAN_NORMALIZE) {
+    utils.meanNormalize(image);
+  } else {
+    utils.standardize(image);
+  }
 
   let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
 
@@ -594,6 +482,7 @@ function predict(endFrame) {
 }
 
 function showPrediction(result) {
+  const inputs = dataset.getInputs();
   utils.assert(result.length == inputs.length);
 
   const maxIdx = utils.indexOfMax(result);
@@ -652,6 +541,9 @@ showImages_btn.addEventListener('click', async () => {
   const drawArea = surface.drawArea; // Get the examples
   drawArea.innerHTML = '';
   const MAX = 20;
+
+  const inputs = dataset.getInputs();
+
   for (let classIdx = 0; classIdx < inputs.length; classIdx++) {
     const p = document.createElement('p');
     p.innerText = inputs[classIdx].label;
@@ -681,9 +573,10 @@ load_btn.addEventListener('click', () => {
 });
 
 function doPrediction() {
-  const data = createData();
-  const testxs = data.xs();
-  const labels = data.ys().argMax([-1]);
+  utils.assert(trained_data != undefined, 'not trained');
+
+  const testxs = trained_data.x_validation;
+  const labels = trained_data.y_validation.argMax([-1]);
   const preds = model.predict(testxs).argMax([-1]);
   testxs.dispose();
   return [preds, labels];
@@ -692,12 +585,6 @@ function doPrediction() {
 /**
  * Accuracy and Confusion Matrix
  */
-let classNames = [];
-
-for (let idx = 0; idx < inputs.length; idx++) {
-  classNames.push(inputs[idx].label);
-}
-
 async function showAccuracy() {
   const [preds, labels] = doPrediction();
 
@@ -706,6 +593,13 @@ async function showAccuracy() {
     name: 'Accuracy',
     tab: 'Evaluation',
   };
+
+  let classNames = [];
+  const inputs = dataset.getInputs();
+  for (let idx = 0; idx < inputs.length; idx++) {
+    classNames.push(inputs[idx].label);
+  }
+
   tfvis.show.perClassAccuracy(container, classAccuracy, classNames);
   labels.dispose();
 }
@@ -717,6 +611,11 @@ async function showConfusion() {
     name: 'Confusion Matrix',
     tab: 'Evaluation',
   };
+  let classNames = [];
+  const inputs = dataset.getInputs();
+  for (let idx = 0; idx < inputs.length; idx++) {
+    classNames.push(inputs[idx].label);
+  }
   tfvis.render.confusionMatrix(container, {
     values: confusionMatrix,
     tickLabels: classNames,
