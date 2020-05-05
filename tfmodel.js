@@ -63,7 +63,7 @@ function createNetwork(width, height, nClasses) {
     model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
-        units: 1000,
+        units: 500,
         activation: 'relu',
       })
     );
@@ -100,8 +100,8 @@ function createNetwork(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 20,
-      shuffle: true,
+      epochs: 30,
+      //shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,
     });

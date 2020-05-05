@@ -13,7 +13,6 @@ const RECORD_SIZE = Math.floor((samplerate * buffertime) / BUFFER_SIZE) * BUFFER
 
 // Ringbuffer Time Domain (1D)
 const RB_SIZE = 2 * RECORD_SIZE; // arbitrary choice, shall be gt RECORD_SIZE and integer fraction of BUFFER_SIZE
-//const timeDomainData = Array.from(Array(RB_SIZE), () => 0);
 const timeDomainData = new CircularBuffer(RB_SIZE);
 
 // RingBuffer Framing (2D)
@@ -23,8 +22,6 @@ let Data_Pos = 0;
 const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
 const LOG_MEL_RAW = []; // log mel filter coefficients
 const LOG_MEL = []; // log mel filter coefficients
-const DCT_RAW = []; // dct -> to be mean normalized
-const DCT = []; // dct range map
 
 // Hamming Window
 const fenster = createWindowing(FRAME_SIZE); // don't call it window ...
@@ -47,7 +44,7 @@ let trained_data = undefined;
 
 // Data augmentation
 const N_AUG = 3;
-const FRACTION = 0.1; // horizontal shift fraction
+const FRACTION = 0.2; // horizontal shift fraction
 const opt = { fill_mode: 'nearest' };
 const generator = createImageDataGenerator(opt);
 
@@ -55,6 +52,8 @@ const generator = createImageDataGenerator(opt);
 let nn; // defined later
 let model;
 const MEAN_NORMALIZE = true; // false -> standardize
+const PRED_IMG = [];
+const PRED_INTERVALL = 500;
 
 //console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
 
@@ -76,41 +75,50 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
   LOG_MEL.push(mel_array);
 }
 
+for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
+  let pred_array = Array.from(Array(B2P1), () => 0);
+  PRED_IMG.push(pred_array);
+}
+
 // Canvas width and height
-let drawit = [false, false, true];
-
-const w = RB_SIZE_FRAMING;
-const h = 100; //N_MEL_FILTER;
-
+let drawit = [false, false, true, true];
 let canvas;
 let canvasCtx;
 let canvas_fftSeries;
 let context_fftSeries;
 let canvas_fftSeries_mel;
 let context_fftSeries_mel;
-let canvas_fftSeries_dct;
-let context_fftSeries_dct;
+let canvas_fftSeries_pred;
+let context_fftSeries_pred;
+(function create_some_stuff() {
+  if (drawit[0]) {
+    canvas = document.getElementById('oscilloscope');
+    canvasCtx = canvas.getContext('2d');
+    canvas.width = 2 * RB_SIZE_FRAMING;
+    canvas.height = 100; //B2P1;
+  }
 
-if (drawit[0]) {
-  canvas = document.getElementById('oscilloscope');
-  canvasCtx = canvas.getContext('2d');
-  canvas.width = 2 * w;
-  canvas.height = h; //B2P1;
-}
+  if (drawit[1]) {
+    canvas_fftSeries = document.getElementById('fft-series');
+    context_fftSeries = canvas_fftSeries.getContext('2d');
+    canvas_fftSeries.width = 2 * RB_SIZE_FRAMING;
+    canvas_fftSeries.height = B2P1;
+  }
 
-if (drawit[1]) {
-  canvas_fftSeries = document.getElementById('fft-series');
-  context_fftSeries = canvas_fftSeries.getContext('2d');
-  canvas_fftSeries.width = 2 * w;
-  canvas_fftSeries.height = B2P1;
-}
+  if (drawit[2]) {
+    canvas_fftSeries_mel = document.getElementById('fft-series mel');
+    context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
+    canvas_fftSeries_mel.width = 4 * RB_SIZE_FRAMING;
+    canvas_fftSeries_mel.height = 4 * N_MEL_FILTER;
+  }
 
-if (drawit[2]) {
-  canvas_fftSeries_mel = document.getElementById('fft-series mel');
-  context_fftSeries_mel = canvas_fftSeries_mel.getContext('2d');
-  canvas_fftSeries_mel.width = 4 * w;
-  canvas_fftSeries_mel.height = 4 * N_MEL_FILTER;
-}
+  if (drawit[3]) {
+    canvas_fftSeries_pred = document.getElementById('fft-series pred');
+    context_fftSeries_pred = canvas_fftSeries_pred.getContext('2d');
+    canvas_fftSeries_pred.width = 4 * RECORD_SIZE_FRAMING;
+    canvas_fftSeries_pred.height = 4 * N_MEL_FILTER;
+  }
+})();
 
 /**
  * Handle mic data
@@ -293,33 +301,28 @@ const draw = function () {
     context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
   }
 
-  // Draw dct spectrum
+  // Draw Pred image
   if (drawit[3]) {
-    context_fftSeries_dct.fillStyle = '#FFF';
-    context_fftSeries_dct.fillRect(0, 0, canvas_fftSeries_dct.width, canvas_fftSeries_dct.height);
+    context_fftSeries_pred.fillStyle = '#FFF';
+    context_fftSeries_pred.fillRect(0, 0, canvas_fftSeries_pred.width, canvas_fftSeries_pred.height);
 
-    rectHeight = canvas_fftSeries_dct.height / N_DCT;
-    rectWidth = canvas_fftSeries_dct.width / RB_SIZE_FRAMING;
+    rectHeight = canvas_fftSeries_pred.height / N_MEL_FILTER;
+    rectWidth = canvas_fftSeries_pred.width / RECORD_SIZE_FRAMING;
     let xpos = 0;
 
-    for (let xidx = Data_Pos; xidx < Data_Pos + RB_SIZE_FRAMING; xidx++) {
-      ypos = canvas_fftSeries_dct.height;
-      for (let yidx = 0; yidx < N_DCT; yidx++) {
-        mag = DCT[xidx % RB_SIZE_FRAMING][yidx];
+    for (let xidx = 0; xidx < PRED_IMG.length; xidx++) {
+      ypos = canvas_fftSeries_pred.height;
+      for (let yidx = 0; yidx < N_MEL_FILTER; yidx++) {
+        mag = PRED_IMG[xidx][yidx];
         mag = Math.round(mag);
-
-        if (xidx % RB_SIZE_FRAMING == STARTFRAME || xidx % RB_SIZE_FRAMING == ENDFRAME) {
-          context_fftSeries_dct.fillStyle = '#800000';
-        } else {
-          context_fftSeries_dct.fillStyle = utils.rainbow[mag];
-        }
-        context_fftSeries_dct.fillRect(xpos, ypos, rectWidth, -rectHeight);
+        context_fftSeries_pred.fillStyle = utils.rainbow[mag];
+        context_fftSeries_pred.fillRect(xpos, ypos, rectWidth, -rectHeight);
         ypos -= rectHeight;
       }
       xpos += rectWidth;
     }
 
-    context_fftSeries_dct.strokeRect(0, 0, canvas_fftSeries_dct.width, canvas_fftSeries_dct.height);
+    context_fftSeries_pred.strokeRect(0, 0, canvas_fftSeries_pred.width, canvas_fftSeries_pred.height);
   }
 
   // draw asap ... but wait some time to get other things done
@@ -362,7 +365,7 @@ function record(e, label) {
   let curpos = STARTFRAME;
 
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    image[idx] = Array.from(LOG_MEL_RAW[idx]);
+    image[idx] = Array.from(LOG_MEL_RAW[curpos]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -373,7 +376,6 @@ function record(e, label) {
     }
   }
 
-  // TODO: what is 'better' meanNormalize or standardize?
   if (MEAN_NORMALIZE) {
     utils.meanNormalize(image);
   } else {
@@ -443,14 +445,15 @@ train_btn.addEventListener('click', async () => {
  * Predict section
  */
 function predict(endFrame) {
-  let startFrame = (endFrame - RECORD_SIZE_FRAMING) % RB_SIZE_FRAMING;
+  let startFrame = endFrame - RECORD_SIZE_FRAMING;
   if (startFrame < 0) {
-    startFrame = RECORD_SIZE_FRAMING + startFrame;
+    startFrame = RB_SIZE_FRAMING + STARTFRAME;
   }
   let image = [];
   let curpos = startFrame;
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
     image[idx] = Array.from(LOG_MEL_RAW[curpos]);
+    PRED_IMG[idx] = Array.from(LOG_MEL[curpos]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -520,12 +523,13 @@ function showPrediction(result) {
 }
 
 predict_btn.addEventListener('click', () => {
-  const INTERVALL = 500; //predict every XXX ms
   setInterval(() => {
     tf.tidy(() => {
       predict(Data_Pos);
     });
-  }, INTERVALL);
+  }, PRED_INTERVALL);
+
+  //TODO: disable btn
 });
 
 // who understands what is happening here, feel free to explain it to me :)
@@ -572,6 +576,9 @@ load_btn.addEventListener('click', () => {
   inputs = Store.getData('data');
 });
 
+/**
+ * Accuracy and Confusion Matrix
+ */
 function doPrediction() {
   utils.assert(trained_data != undefined, 'not trained');
 
@@ -582,9 +589,6 @@ function doPrediction() {
   return [preds, labels];
 }
 
-/**
- * Accuracy and Confusion Matrix
- */
 async function showAccuracy() {
   const [preds, labels] = doPrediction();
 
