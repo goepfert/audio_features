@@ -18,10 +18,10 @@ const timeDomainData = new CircularBuffer(RB_SIZE);
 // RingBuffer Framing (2D)
 const RB_SIZE_FRAMING = utils.getNumberOfFrames(RB_SIZE, FRAME_SIZE, FRAME_STRIDE); // how many frames with overlap fit into time domain ringbuffer
 const RECORD_SIZE_FRAMING = utils.getNumberOfFrames(RECORD_SIZE, FRAME_SIZE, FRAME_STRIDE); // number of frames in record
-let Data_Pos = 0;
+let Data_Pos = 0; // head position
 const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
 const LOG_MEL_RAW = []; // log mel filter coefficients
-const LOG_MEL = []; // log mel filter coefficients
+const LOG_MEL = []; // log mel filter coefficients after some scaling for visualization
 
 // Hamming Window
 const fenster = createWindowing(FRAME_SIZE); // don't call it window ...
@@ -38,13 +38,13 @@ const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
 filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 
 // Dataset
-const NCLASSES = 3; // How many classes to classify (normally, the first class refers to the background)
+const NCLASSES = 5; // How many classes to classify (normally, the first class refers to the background)
 const dataset = createDataset(NCLASSES, 0.2); // validation split
 let trained_data = undefined;
 
 // Data augmentation
-const N_AUG = 3;
-const FRACTION = 0.2; // horizontal shift fraction
+const N_AUG = 4;
+const FRACTION = 0.25; // horizontal shift fraction
 const opt = { fill_mode: 'nearest' };
 const generator = createImageDataGenerator(opt);
 
@@ -58,6 +58,7 @@ const PRED_INTERVALL = 500;
 //console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
 
 // Plotting
+const ANIM_INTERVALL = 100;
 let STARTFRAME; // Recording Startframe (used for drawing)
 let ENDFRAME; // Recording Endframe (used for drawing)
 const MIN_EXP = -1; // 10^{min_exp} linear, log scale minimum
@@ -71,12 +72,12 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
   let mel_raw_array = Array.from(Array(N_MEL_FILTER), () => 0);
   LOG_MEL_RAW.push(mel_raw_array);
 
-  let mel_array = Array.from(Array(N_MEL_FILTER), () => 0);
+  let mel_array = Array.from(Array(N_MEL_FILTER), () => 255);
   LOG_MEL.push(mel_array);
 }
 
 for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-  let pred_array = Array.from(Array(B2P1), () => 0);
+  let pred_array = Array.from(Array(N_MEL_FILTER), () => 255);
   PRED_IMG.push(pred_array);
 }
 
@@ -115,7 +116,7 @@ let context_fftSeries_pred;
   if (drawit[3]) {
     canvas_fftSeries_pred = document.getElementById('fft-series pred');
     context_fftSeries_pred = canvas_fftSeries_pred.getContext('2d');
-    canvas_fftSeries_pred.width = 4 * RECORD_SIZE_FRAMING;
+    canvas_fftSeries_pred.width = 4 * RB_SIZE_FRAMING;
     canvas_fftSeries_pred.height = 4 * N_MEL_FILTER;
   }
 })();
@@ -187,7 +188,8 @@ function doFraming() {
 
     // MelFilter;
     let mel_array = filter.getLogMelCoefficients(mag);
-    LOG_MEL_RAW[Data_Pos] = Array.from(mel_array);
+    //LOG_MEL_RAW[Data_Pos] = Array.from(mel_array);
+    LOG_MEL_RAW[Data_Pos] = mel_array;
     LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
 
     // Bookeeping
@@ -307,8 +309,8 @@ const draw = function () {
     context_fftSeries_pred.fillRect(0, 0, canvas_fftSeries_pred.width, canvas_fftSeries_pred.height);
 
     rectHeight = canvas_fftSeries_pred.height / N_MEL_FILTER;
-    rectWidth = canvas_fftSeries_pred.width / RECORD_SIZE_FRAMING;
-    let xpos = 0;
+    rectWidth = canvas_fftSeries_pred.width / RB_SIZE_FRAMING;
+    let xpos = (PRED_IMG.length + 2) * rectWidth; // magic
 
     for (let xidx = 0; xidx < PRED_IMG.length; xidx++) {
       ypos = canvas_fftSeries_pred.height;
@@ -322,13 +324,18 @@ const draw = function () {
       xpos += rectWidth;
     }
 
-    context_fftSeries_pred.strokeRect(0, 0, canvas_fftSeries_pred.width, canvas_fftSeries_pred.height);
+    context_fftSeries_pred.strokeRect(
+      (PRED_IMG.length + 2) * rectWidth,
+      0,
+      canvas_fftSeries_pred.width,
+      canvas_fftSeries_pred.height
+    );
   }
 
   // draw asap ... but wait some time to get other things done
   setTimeout(() => {
     requestAnimationFrame(draw);
-  }, 200);
+  }, ANIM_INTERVALL);
 }; // end draw fcn
 
 draw();
@@ -445,12 +452,15 @@ train_btn.addEventListener('click', async () => {
  * Predict section
  */
 function predict(endFrame) {
+  //console.log(utils.getTime());
+
   let startFrame = endFrame - RECORD_SIZE_FRAMING;
   if (startFrame < 0) {
-    startFrame = RB_SIZE_FRAMING + STARTFRAME;
+    startFrame = RB_SIZE_FRAMING + startFrame;
   }
   let image = [];
   let curpos = startFrame;
+
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
     image[idx] = Array.from(LOG_MEL_RAW[curpos]);
     PRED_IMG[idx] = Array.from(LOG_MEL[curpos]);
@@ -464,7 +474,7 @@ function predict(endFrame) {
     }
   }
 
-  // check which what option the nn was trained!
+  //check which what option the nn was trained!
   if (MEAN_NORMALIZE) {
     utils.meanNormalize(image);
   } else {

@@ -180,6 +180,19 @@ const utils = (function () {
     }
   }
 
+  function checkTime(i) {
+    return i < 10 ? '0' + i : i;
+  }
+
+  function getTime() {
+    let today = new Date(),
+      h = checkTime(today.getHours()),
+      m = checkTime(today.getMinutes()),
+      s = checkTime(today.getSeconds());
+    ms = checkTime(today.getMilliseconds());
+    return `${h}:${m}:${s}:${ms}`;
+  }
+
   return {
     grayscale: _grayscale,
     rainbow: _rainbow,
@@ -197,5 +210,6 @@ const utils = (function () {
     meanNormalize: meanNormalize,
     minMaxNormalize: minMaxNormalize,
     standardize: standardize,
+    getTime: getTime,
   };
 })();

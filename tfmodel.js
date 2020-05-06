@@ -1,6 +1,5 @@
 /**
  * Model CNN
- * TODO: scale image [-1,1] -> done
  */
 
 function createNetwork(width, height, nClasses) {
@@ -19,7 +18,7 @@ function createNetwork(width, height, nClasses) {
       tf.layers.conv2d({
         inputShape: [IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS],
         dataFormat: 'channelsLast',
-        kernelSize: [2, 2],
+        kernelSize: [4, 2],
         //padding: 'same', // TODO: check influence
         filters: 8,
         strides: [1, 1],
@@ -30,8 +29,8 @@ function createNetwork(width, height, nClasses) {
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
     model.add(
       tf.layers.conv2d({
-        kernelSize: [2, 2],
-        filters: 16,
+        kernelSize: [4, 2],
+        filters: 32,
         strides: 1,
         activation: 'relu',
         kernelInitializer: 'varianceScaling',
@@ -40,8 +39,8 @@ function createNetwork(width, height, nClasses) {
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
     model.add(
       tf.layers.conv2d({
-        kernelSize: [2, 2],
-        filters: 16,
+        kernelSize: [4, 2],
+        filters: 32,
         strides: 1,
         activation: 'relu',
         kernelInitializer: 'varianceScaling',
@@ -100,8 +99,8 @@ function createNetwork(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 30,
-      //shuffle: true,
+      epochs: 20,
+      shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,
     });
