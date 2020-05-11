@@ -8,6 +8,7 @@ const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the m
 const FRAME_SIZE = samplerate * 0.025; // Frame_time == 25 ms
 const FRAME_STRIDE = samplerate * 0.01; // Frame_stride == 10 ms (=> 15 ms overlap)
 
+// ASR
 const buffertime = 1; // in seconds
 const RECORD_SIZE = Math.floor((samplerate * buffertime) / BUFFER_SIZE) * BUFFER_SIZE; // ~buffertime in number of samples, ensure integer fraction size of concat
 
@@ -34,8 +35,14 @@ const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 const N_MEL_FILTER = 40; // Number of Mel Filterbanks (power of 2 for DCT)
 const filter = mel_filter();
 const MIN_FREQUENCY = 300; // lower end of first mel filter bank
+// TODO: if we cut off frequencies above 8 kHz, we may save some mips if we downsample e.g. to 16 kHz before (low pass and taking every third sample)
 const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
 filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
+
+// VAD - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6150492/
+// I want to get an quadratic image, thus
+const VAD_SIZE = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE);
+console.log(VAD_SIZE);
 
 // Dataset
 const NCLASSES = 5; // How many classes to classify (normally, the first class refers to the background)

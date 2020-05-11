@@ -98,6 +98,12 @@ const utils = (function () {
     return 1 + Math.floor((total_size - frame_size) / frame_stride);
   }
 
+  function getSizeOfBuffer(n_frames, frame_size, frame_stride) {
+    assert(n_frames > 1, 'number of frames too low');
+    assert(frame_size > frame_stride, 'stride larger than frame size ...?');
+    return frame_size + (n_frames - 1) * frame_stride;
+  }
+
   // [-1, 1]
   function meanNormalize(buffer2D) {
     let nRow = buffer2D.length;
@@ -188,8 +194,8 @@ const utils = (function () {
     let today = new Date(),
       h = checkTime(today.getHours()),
       m = checkTime(today.getMinutes()),
-      s = checkTime(today.getSeconds());
-    ms = checkTime(today.getMilliseconds());
+      s = checkTime(today.getSeconds()),
+      ms = checkTime(today.getMilliseconds());
     return `${h}:${m}:${s}:${ms}`;
   }
 
@@ -207,6 +213,7 @@ const utils = (function () {
     decibelsToLinear: decibelsToLinear,
     linearToDecibels: linearToDecibels,
     getNumberOfFrames: getNumberOfFrames,
+    getSizeOfBuffer: getSizeOfBuffer,
     meanNormalize: meanNormalize,
     minMaxNormalize: minMaxNormalize,
     standardize: standardize,
