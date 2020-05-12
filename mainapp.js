@@ -42,7 +42,8 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 // VAD - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6150492/
 // I want to get an quadratic image, thus
 const VAD_SIZE = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE);
-console.log(VAD_SIZE);
+const VAD_IMG = [];
+const VAD_RESULT = []; // result of VAD
 
 // Dataset
 const NCLASSES = 5; // How many classes to classify (normally, the first class refers to the background)
@@ -81,11 +82,18 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
 
   let mel_array = Array.from(Array(N_MEL_FILTER), () => 255);
   LOG_MEL.push(mel_array);
+
+  VAD.push(0);
 }
 
 for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
   let pred_array = Array.from(Array(N_MEL_FILTER), () => 255);
   PRED_IMG.push(pred_array);
+}
+
+for (let idx = 0; idx < VAD_SIZE; idx++) {
+  let vad_array = Array.from(Array(N_MEL_FILTER), () => 255);
+  VAD_IMG.push(vad_array);
 }
 
 // Canvas width and height
@@ -142,12 +150,10 @@ const handleSuccess = function (stream) {
 
   processor.onaudioprocess = function (e) {
     const inputBuffer = e.inputBuffer;
-    timeDomainData2 = inputBuffer.getChannelData(0);
-
-    data = inputBuffer.getChannelData(0);
-    timeDomainData.concat(data);
+    timeDomainData.concat(inputBuffer.getChannelData(0));
 
     doFraming();
+    doVAD();
 
     // Clear frames (for drawing start and end of vertical line when recording)
     if (STARTFRAME == Data_Pos) {
@@ -206,6 +212,35 @@ function doFraming() {
   }
 
   nextStartPos = startPos;
+}
+
+let vad_nextStartPos = 0;
+function doVAD() {
+  // check if you have enough data for VAD
+  let availableData = Data_Pos - vad_nextStartPos;
+  if (availableData < 0) {
+    availableData = Data_Pos + RB_SIZE_FRAMING - vad_nextStartPos;
+  }
+
+  if (availableData < VAD_SIZE) {
+    return;
+  }
+
+  let curpos = vad_nextStartPos;
+  let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
+
+  for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+    VAD_IMG = Array.from(LOG_MEL_RAW[curpos]);
+    curpos++;
+    if (curpos >= RB_SIZE_FRAMING) {
+      curpos = 0;
+    }
+    if (curpos == endPos) {
+      break;
+    }
+  }
+
+  vad_nextStartPos = endPos;
 }
 
 /**
