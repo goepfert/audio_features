@@ -41,7 +41,7 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 
 // VAD - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6150492/
 // I want to get an quadratic image, thus
-const VAD_SIZE = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE);
+const VAD_SIZE = N_MEL_FILTER; // utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE);
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
 
@@ -83,7 +83,7 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
   let mel_array = Array.from(Array(N_MEL_FILTER), () => 255);
   LOG_MEL.push(mel_array);
 
-  VAD.push(0);
+  VAD_RESULT.push(0);
 }
 
 for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
@@ -218,6 +218,7 @@ let vad_nextStartPos = 0;
 function doVAD() {
   // check if you have enough data for VAD
   let availableData = Data_Pos - vad_nextStartPos;
+
   if (availableData < 0) {
     availableData = Data_Pos + RB_SIZE_FRAMING - vad_nextStartPos;
   }
@@ -227,10 +228,10 @@ function doVAD() {
   }
 
   let curpos = vad_nextStartPos;
+  let curpos2 = vad_nextStartPos;
   let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
-
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-    VAD_IMG = Array.from(LOG_MEL_RAW[curpos]);
+    VAD_IMG[idx] = Array.from(LOG_MEL_RAW[curpos]);
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
       curpos = 0;
@@ -240,7 +241,24 @@ function doVAD() {
     }
   }
 
-  vad_nextStartPos = endPos;
+  // about 50% overlap
+  vad_nextStartPos = Math.round(vad_nextStartPos + VAD_SIZE / 2);
+  vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
+
+  //get voice activity in current frame
+  let result = Math.random();
+  //let result = vad_nn.predict(VAD_IMG);
+
+  for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+    VAD_RESULT[curpos2] = result;
+    curpos2++;
+    if (curpos2 >= RB_SIZE_FRAMING) {
+      curpos2 = 0;
+    }
+    if (curpos2 == endPos) {
+      break;
+    }
+  }
 }
 
 /**
@@ -343,6 +361,26 @@ const draw = function () {
     }
 
     context_fftSeries_mel.strokeRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
+
+    // Draw VAD on top
+    context_fftSeries_mel.beginPath();
+    context_fftSeries_mel.lineWidth = 2;
+    context_fftSeries_mel.strokeStyle = '#000099';
+    let sliceWidth = canvas_fftSeries_mel.width / RB_SIZE_FRAMING;
+    let x = 0;
+    //let timearray = timeDomainData.getSlice(timeDomainData.lastHead, timeDomainData.head);
+    for (let i = 0; i < RB_SIZE_FRAMING; i++) {
+      let v = VAD_RESULT[i];
+      //console.log(v);
+      let y = v * canvas_fftSeries_mel.height;
+      if (i === 0) {
+        context_fftSeries_mel.moveTo(x, y);
+      } else {
+        context_fftSeries_mel.lineTo(x, y);
+      }
+      x += sliceWidth;
+    }
+    context_fftSeries_mel.stroke();
   }
 
   // Draw Pred image
