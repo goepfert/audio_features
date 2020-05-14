@@ -41,13 +41,15 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 
 // VAD - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6150492/
 // I want to get an quadratic image, thus
-const VAD_SIZE = N_MEL_FILTER; // utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE);
+const VAD_SIZE = N_MEL_FILTER;
+const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
 
-// Dataset
+// Datasets
 const NCLASSES = 5; // How many classes to classify (normally, the first class refers to the background)
 const dataset = createDataset(NCLASSES, 0.2); // validation split
+const dataset_vad = createDataset(2, 0.2); // validation split
 let trained_data = undefined;
 
 // Data augmentation
@@ -433,9 +435,22 @@ for (let idx = 0; idx < NCLASSES; idx++) {
   record_btns_div.appendChild(label);
 }
 
+const record_btns_vad_div = document.getElementById('record_btns_vad');
+for (let idx = 0; idx < 2; idx++) {
+  const btn = document.createElement('button');
+  btn.classList.add('record_btn_vad');
+  btn.id = `class${idx + 1}`;
+  btn.innerHTML = `Record class${idx + 1}`;
+  const label = document.createElement('label');
+  label.htmlFor = `class${idx + 1}`;
+  record_btns_vad_div.appendChild(btn);
+  record_btns_vad_div.appendChild(label);
+}
+
 /**
  * Get collection of buttons
  */
+const record_btns_vad = document.getElementsByClassName('record_btn_vad');
 const record_btns = document.getElementsByClassName('record_btn');
 const train_btn = document.getElementById('train_btn');
 const predict_btn = document.getElementById('predict_btn');
@@ -443,7 +458,7 @@ const showImages_btn = document.getElementById('showImages_btn');
 toggleButtons(false);
 
 /**
- * extract snapshot of RECORDTIME from raw dct ringbuffer
+ * extract snapshot of RECORDTIME from raw mel ringbuffer
  */
 function record(e, label) {
   //let endFrame = SERIES_POS;
@@ -492,6 +507,59 @@ for (let idx = 0; idx < record_btns.length; idx++) {
     setTimeout(() => {
       record(e, label);
     }, buffertime * 1000); //Fuck ... not always the same length (but always larger :))
+  });
+}
+
+/**
+ * extract snapshots of RECORDTIME from raw mel ringbuffer
+ */
+function record_vad(e, label) {
+  //let endFrame = SERIES_POS;
+  ENDFRAME = (STARTFRAME + VAD_SIZE) % RB_SIZE_FRAMING;
+  let image = [];
+  let curpos = STARTFRAME;
+
+  for (let idx = 0; idx < VAD_SIZE; idx++) {
+    image[idx] = Array.from(LOG_MEL_RAW[curpos]);
+
+    curpos++;
+    if (curpos >= RB_SIZE_FRAMING) {
+      curpos = 0;
+    }
+    if (curpos == ENDFRAME) {
+      break;
+    }
+  }
+
+  if (MEAN_NORMALIZE) {
+    utils.meanNormalize(image);
+  } else {
+    utils.standardize(image);
+  }
+
+  dataset_vad.addImage(image, label);
+
+  e.target.labels[0].innerHTML = `${dataset.getNumImages(label)}`;
+  console.log('recording finished');
+} // end recording
+
+// Event listeners for record buttons VAD
+for (let idx = 0; idx < record_btns_vad.length; idx++) {
+  record_btns_vad[idx].addEventListener('click', (e) => {
+    let label = record_btns_vad[idx].id;
+
+    let N = 0;
+    let intervall = setInterval(() => {
+      N++;
+      if (N > 4) {
+        clearInterval(intervall);
+      }
+      console.log('record vad:', label);
+      STARTFRAME = Data_Pos;
+      ENDFRAME = undefined;
+      console.log(Data_Pos);
+      record_vad(e, label);
+    }, VAD_TIME * 1000);
   });
 }
 
