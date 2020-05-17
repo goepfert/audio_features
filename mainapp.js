@@ -51,6 +51,7 @@ const NCLASSES = 5; // How many classes to classify (normally, the first class r
 const dataset = createDataset(NCLASSES, 0.2); // validation split
 const dataset_vad = createDataset(2, 0.2); // validation split
 let trained_data = undefined;
+let trained_data_vad = undefined;
 
 // Data augmentation
 const N_AUG = 4;
@@ -61,6 +62,8 @@ const generator = createImageDataGenerator(opt);
 // Neural Network
 let nn; // defined later
 let model;
+let nn_vad; // defined later
+let model_vad;
 const MEAN_NORMALIZE = true; // false -> standardize
 const PRED_IMG = [];
 const PRED_INTERVALL = 500;
@@ -539,13 +542,15 @@ function record_vad(e, label) {
 
   dataset_vad.addImage(image, label);
 
-  e.target.labels[0].innerHTML = `${dataset.getNumImages(label)}`;
+  e.target.labels[0].innerHTML = `${dataset_vad.getNumImages(label)}`;
   console.log('recording finished');
 } // end recording
 
 // Event listeners for record buttons VAD
 for (let idx = 0; idx < record_btns_vad.length; idx++) {
   record_btns_vad[idx].addEventListener('click', (e) => {
+    toggleRecordButtons_vad(true);
+
     let label = record_btns_vad[idx].id;
 
     let N = 0;
@@ -553,6 +558,7 @@ for (let idx = 0; idx < record_btns_vad.length; idx++) {
       N++;
       if (N > 4) {
         clearInterval(intervall);
+        toggleRecordButtons_vad(false);
       }
       console.log('record vad:', label);
       STARTFRAME = Data_Pos;
@@ -566,6 +572,12 @@ for (let idx = 0; idx < record_btns_vad.length; idx++) {
 function toggleRecordButtons(flag) {
   for (let idx = 0; idx < record_btns.length; idx++) {
     record_btns[idx].disabled = flag;
+  }
+}
+
+function toggleRecordButtons_vad(flag) {
+  for (let idx = 0; idx < record_btns_vad.length; idx++) {
+    record_btns_vad[idx].disabled = flag;
   }
 }
 
@@ -593,6 +605,20 @@ train_btn.addEventListener('click', async () => {
   console.log('training finished');
 
   togglePredictButton(false);
+  //TODO: toggleAccuracy
+});
+
+/**
+ * Create Network for VAD and attach training to training button
+ */
+train_btn_vad.addEventListener('click', async () => {
+  nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2);
+  model_vad = nn_vad.getModel();
+  tfvis.show.modelSummary({ name: 'Model Summary' }, model_vad);
+  trained_data_vad = dataset_vad.getData();
+  await nn_vad.train(trained_data_vad.x, trained_data_vad.y, model_vad);
+  console.log('training finished');
+
   //TODO: toggleAccuracy
 });
 
