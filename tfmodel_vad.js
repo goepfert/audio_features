@@ -79,7 +79,7 @@ function createNetwork_VAD(width, height, nClasses) {
     const BATCH_SIZE = 8;
     const metrics = ['loss', 'val_loss', 'acc', 'val_acc'];
     const container = {
-      name: 'Model Training',
+      name: 'Model Training VAD',
       styles: { height: '1000px' },
     };
     //const fitCallbacks = tfvis.show.fitCallbacks(container, metrics);

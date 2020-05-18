@@ -220,6 +220,7 @@ function doFraming() {
 }
 
 let vad_nextStartPos = 0;
+let vad_lastStartPos = 0;
 function doVAD() {
   // check if you have enough data for VAD
   let availableData = Data_Pos - vad_nextStartPos;
@@ -246,16 +247,14 @@ function doVAD() {
     }
   }
 
-  // about 50% overlap
-  vad_nextStartPos = Math.round(vad_nextStartPos + VAD_SIZE / 2);
-  vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
-
-  //get voice activity in current frame
-  let result = Math.random();
-  //let result = vad_nn.predict(VAD_IMG);
+  if (MEAN_NORMALIZE) {
+    utils.meanNormalize(VAD_IMG);
+  } else {
+    utils.standardize(VAD_IMG);
+  }
 
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-    VAD_RESULT[curpos2] = result;
+    VAD_RESULT[curpos2] = 0;
     curpos2++;
     if (curpos2 >= RB_SIZE_FRAMING) {
       curpos2 = 0;
@@ -264,6 +263,38 @@ function doVAD() {
       break;
     }
   }
+
+  if (model_vad != undefined) {
+    tf.tidy(() => {
+      //get voice activity in current frame
+      let x = tf.tensor2d(VAD_IMG).reshape([1, VAD_SIZE, N_MEL_FILTER, 1]);
+
+      model_vad
+        .predict(x)
+        .data()
+        .then((result) => {
+          for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+            VAD_RESULT[curpos2] = result[1];
+            curpos2++;
+            if (curpos2 >= RB_SIZE_FRAMING) {
+              curpos2 = 0;
+            }
+            if (curpos2 == endPos) {
+              break;
+            }
+          }
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    });
+  }
+
+  // about 50% overlap
+  //vad_nextStartPos = Math.round(vad_nextStartPos + VAD_SIZE / 2);
+  vad_lastStartPos = vad_nextStartPos;
+  vad_nextStartPos = vad_nextStartPos + VAD_SIZE;
+  vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
 }
 
 /**
@@ -372,18 +403,18 @@ const draw = function () {
     context_fftSeries_mel.lineWidth = 2;
     context_fftSeries_mel.strokeStyle = '#000099';
     let sliceWidth = canvas_fftSeries_mel.width / RB_SIZE_FRAMING;
-    let x = 0;
+    xpos = 0;
     //let timearray = timeDomainData.getSlice(timeDomainData.lastHead, timeDomainData.head);
-    for (let i = 0; i < RB_SIZE_FRAMING; i++) {
-      let v = VAD_RESULT[i];
+    for (let xidx = Data_Pos; xidx < Data_Pos + RB_SIZE_FRAMING; xidx++) {
+      let v = 1 - VAD_RESULT[xidx % RB_SIZE_FRAMING];
       //console.log(v);
       let y = v * canvas_fftSeries_mel.height;
-      if (i === 0) {
-        context_fftSeries_mel.moveTo(x, y);
+      if (xidx === Data_Pos) {
+        context_fftSeries_mel.moveTo(xpos, y);
       } else {
-        context_fftSeries_mel.lineTo(x, y);
+        context_fftSeries_mel.lineTo(xpos, y);
       }
-      x += sliceWidth;
+      xpos += sliceWidth;
     }
     context_fftSeries_mel.stroke();
   }
@@ -707,12 +738,14 @@ function showPrediction(result) {
 }
 
 predict_btn.addEventListener('click', () => {
-  setInterval(() => {
-    tf.tidy(() => {
-      predict(Data_Pos);
-    });
-  }, PRED_INTERVALL);
-
+  // setInterval(() => {
+  //   tf.tidy(() => {
+  //     predict_vad(Data_Pos);
+  //   });
+  // }, PRED_INTERVALL);
+  tf.tidy(() => {
+    predict_vad(Data_Pos);
+  });
   //TODO: disable btn
 });
 
