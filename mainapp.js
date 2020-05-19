@@ -45,6 +45,7 @@ const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
+const VAD_THRESHOLD = 0.8;
 
 // Datasets
 const NCLASSES = 5; // How many classes to classify (normally, the first class refers to the background)
@@ -66,7 +67,10 @@ let nn_vad; // defined later
 let model_vad;
 const MEAN_NORMALIZE = true; // false -> standardize
 const PRED_IMG = [];
-const PRED_INTERVALL = 500;
+// no vad -> about 500 ms
+// with vad -> VAD_TIME ?
+//console.log(VAD_TIME);
+const PRED_INTERVALL = VAD_TIME;
 
 //console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
 
@@ -220,7 +224,6 @@ function doFraming() {
 }
 
 let vad_nextStartPos = 0;
-let vad_lastStartPos = 0;
 function doVAD() {
   // check if you have enough data for VAD
   let availableData = Data_Pos - vad_nextStartPos;
@@ -234,7 +237,6 @@ function doVAD() {
   }
 
   let curpos = vad_nextStartPos;
-  let curpos2 = vad_nextStartPos;
   let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
     VAD_IMG[idx] = Array.from(LOG_MEL_RAW[curpos]);
@@ -253,17 +255,7 @@ function doVAD() {
     utils.standardize(VAD_IMG);
   }
 
-  for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-    VAD_RESULT[curpos2] = 0;
-    curpos2++;
-    if (curpos2 >= RB_SIZE_FRAMING) {
-      curpos2 = 0;
-    }
-    if (curpos2 == endPos) {
-      break;
-    }
-  }
-
+  curpos = vad_nextStartPos;
   if (model_vad != undefined) {
     tf.tidy(() => {
       //get voice activity in current frame
@@ -274,12 +266,12 @@ function doVAD() {
         .data()
         .then((result) => {
           for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-            VAD_RESULT[curpos2] = result[1];
-            curpos2++;
-            if (curpos2 >= RB_SIZE_FRAMING) {
-              curpos2 = 0;
+            VAD_RESULT[curpos] = result[1];
+            curpos++;
+            if (curpos >= RB_SIZE_FRAMING) {
+              curpos = 0;
             }
-            if (curpos2 == endPos) {
+            if (curpos == endPos) {
               break;
             }
           }
@@ -292,7 +284,7 @@ function doVAD() {
 
   // about 50% overlap
   //vad_nextStartPos = Math.round(vad_nextStartPos + VAD_SIZE / 2);
-  vad_lastStartPos = vad_nextStartPos;
+  // no overlap, there is no need I guess
   vad_nextStartPos = vad_nextStartPos + VAD_SIZE;
   vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
 }
@@ -473,10 +465,10 @@ const record_btns_vad_div = document.getElementById('record_btns_vad');
 for (let idx = 0; idx < 2; idx++) {
   const btn = document.createElement('button');
   btn.classList.add('record_btn_vad');
-  btn.id = `class${idx + 1}`;
-  btn.innerHTML = `Record class${idx + 1}`;
+  btn.id = `vad class${idx + 1}`;
+  btn.innerHTML = `Record VAD class${idx + 1}`;
   const label = document.createElement('label');
-  label.htmlFor = `class${idx + 1}`;
+  label.htmlFor = `vad class${idx + 1}`;
   record_btns_vad_div.appendChild(btn);
   record_btns_vad_div.appendChild(label);
 }
@@ -571,6 +563,7 @@ function record_vad(e, label) {
     utils.standardize(image);
   }
 
+  label = label.split(' ')[1]; // lovely ... :(
   dataset_vad.addImage(image, label);
 
   e.target.labels[0].innerHTML = `${dataset_vad.getNumImages(label)}`;
@@ -594,7 +587,6 @@ for (let idx = 0; idx < record_btns_vad.length; idx++) {
       console.log('record vad:', label);
       STARTFRAME = Data_Pos;
       ENDFRAME = undefined;
-      console.log(Data_Pos);
       record_vad(e, label);
     }, VAD_TIME * 1000);
   });
@@ -663,9 +655,33 @@ function predict(endFrame) {
   if (startFrame < 0) {
     startFrame = RB_SIZE_FRAMING + startFrame;
   }
-  let image = [];
-  let curpos = startFrame;
 
+  // check for voice activity
+  let curpos = startFrame;
+  let vad = 0;
+  let size = 0;
+  // likely that the last vad is not yet calculated
+  for (let idx = 0; idx < RECORD_SIZE_FRAMING - VAD_SIZE; idx++) {
+    vad += VAD_RESULT[curpos];
+    curpos++;
+    size++;
+    if (curpos >= RB_SIZE_FRAMING) {
+      curpos = 0;
+    }
+    if (curpos == endFrame) {
+      break;
+    }
+  }
+  vad /= size;
+
+  if (vad < VAD_THRESHOLD) {
+    return;
+  }
+
+  console.log('voice activity detected:', vad);
+
+  let image = [];
+  curpos = startFrame;
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
     image[idx] = Array.from(LOG_MEL_RAW[curpos]);
     PRED_IMG[idx] = Array.from(LOG_MEL[curpos]);
@@ -687,6 +703,8 @@ function predict(endFrame) {
   }
 
   let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
+
+  utils.assert(model != undefined, 'not trained yet?');
 
   model
     .predict(x)
@@ -738,14 +756,11 @@ function showPrediction(result) {
 }
 
 predict_btn.addEventListener('click', () => {
-  // setInterval(() => {
-  //   tf.tidy(() => {
-  //     predict_vad(Data_Pos);
-  //   });
-  // }, PRED_INTERVALL);
-  tf.tidy(() => {
-    predict_vad(Data_Pos);
-  });
+  setInterval(() => {
+    tf.tidy(() => {
+      predict(Data_Pos);
+    });
+  }, PRED_INTERVALL);
   //TODO: disable btn
 });
 
