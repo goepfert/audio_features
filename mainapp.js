@@ -35,7 +35,7 @@ const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 const N_MEL_FILTER = 40; // Number of Mel Filterbanks (power of 2 for DCT)
 const filter = mel_filter();
 const MIN_FREQUENCY = 300; // lower end of first mel filter bank
-// TODO: if we cut off frequencies above 8 kHz, we may save some mips if we downsample e.g. to 16 kHz before (low pass and taking every third sample)
+// TODO: if we cut off frequencies above 8 kHz, we may save some mips if we downsample e.g. to 16 kHz before (low pass and taking every third sample if we have 48 kHz)
 const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
 filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 
@@ -46,6 +46,9 @@ const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) /
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
 const VAD_THRESHOLD = 0.8;
+const VAD_N_SNAPSHOTS = 10;
+let VAD_LAST_POS = 0;
+let tik = true;
 
 // Datasets
 const NCLASSES = 5; // How many classes to classify (normally, the first class refers to the background)
@@ -223,6 +226,7 @@ function doFraming() {
   nextStartPos = startPos;
 }
 
+let vad_prevEndPos = 0;
 let vad_nextStartPos = 0;
 function doVAD() {
   // check if you have enough data for VAD
@@ -238,8 +242,13 @@ function doVAD() {
 
   let curpos = vad_nextStartPos;
   let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
+
+  //console.log(vad_nextStartPos, endPos, vad_prevEndPos);
+
+  // copy image
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
     VAD_IMG[idx] = Array.from(LOG_MEL_RAW[curpos]);
+
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
       curpos = 0;
@@ -255,38 +264,91 @@ function doVAD() {
     utils.standardize(VAD_IMG);
   }
 
+  let r = 0.25;
+  if (tik) {
+    r = 0.75;
+    tik = false;
+  } else {
+    tik = true;
+  }
+
+  // make vad prediction and fill result
+  // do some averaging when overlapping (does not look very efficient though)
   curpos = vad_nextStartPos;
   if (model_vad != undefined) {
     tf.tidy(() => {
       //get voice activity in current frame
       let x = tf.tensor2d(VAD_IMG).reshape([1, VAD_SIZE, N_MEL_FILTER, 1]);
 
-      model_vad
-        .predict(x)
-        .data()
-        .then((result) => {
-          for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-            VAD_RESULT[curpos] = result[1];
-            curpos++;
-            if (curpos >= RB_SIZE_FRAMING) {
-              curpos = 0;
-            }
-            if (curpos == endPos) {
-              break;
-            }
-          }
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+      // model_vad
+      //   .predict(x)
+      //   .data()
+      //   .then((result) => {
+      //     let hit = false;
+      //     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+      //       if (curpos == vad_prevEndPos) {
+      //         hit = true;
+      //       }
+      //       if (!hit) {
+      //         //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
+      //         VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
+      //       } else {
+      //         //VAD_RESULT[curpos] = result[1];
+      //         VAD_RESULT[curpos] = r;
+      //       }
+
+      //       curpos++;
+      //       if (curpos >= RB_SIZE_FRAMING) {
+      //         curpos = 0;
+      //       }
+      //       if (curpos == endPos) {
+      //         break;
+      //       }
+      //     }
+      //     // do it in here :)
+      //     vad_prevEndPos = endPos;
+      //   })
+      //   .catch((err) => {
+      //     console.log(err);
+      //   });
+
+      const res = model_vad.predict(x);
+      const result = res.dataSync();
+      let hit = false;
+      for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+        if (curpos == vad_prevEndPos) {
+          hit = true;
+        }
+        if (!hit) {
+          //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
+          VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
+        } else {
+          //VAD_RESULT[curpos] = result[1];
+          VAD_RESULT[curpos] = r;
+        }
+
+        curpos++;
+        if (curpos >= RB_SIZE_FRAMING) {
+          curpos = 0;
+        }
+        if (curpos == endPos) {
+          break;
+        }
+      }
+      // do it in here :)
+      vad_prevEndPos = endPos;
     });
   }
 
+  VAD_LAST_POS = vad_nextStartPos + VAD_SIZE;
   // about 50% overlap
-  //vad_nextStartPos = Math.round(vad_nextStartPos + VAD_SIZE / 2);
-  // no overlap, there is no need I guess
-  vad_nextStartPos = vad_nextStartPos + VAD_SIZE;
+  vad_nextStartPos = Math.round(vad_nextStartPos + VAD_SIZE / 2);
+
+  // no overlap
+  //vad_nextStartPos = vad_nextStartPos + VAD_SIZE;
+
   vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
+  VAD_LAST_POS = VAD_LAST_POS % RB_SIZE_FRAMING;
 }
 
 /**
@@ -392,12 +454,16 @@ const draw = function () {
 
     // Draw VAD on top
     context_fftSeries_mel.beginPath();
-    context_fftSeries_mel.lineWidth = 2;
-    context_fftSeries_mel.strokeStyle = '#000099';
+    context_fftSeries_mel.lineWidth = 3;
+    context_fftSeries_mel.strokeStyle = '#990000';
     let sliceWidth = canvas_fftSeries_mel.width / RB_SIZE_FRAMING;
     xpos = 0;
     //let timearray = timeDomainData.getSlice(timeDomainData.lastHead, timeDomainData.head);
     for (let xidx = Data_Pos; xidx < Data_Pos + RB_SIZE_FRAMING; xidx++) {
+      if (xidx % RB_SIZE_FRAMING == VAD_LAST_POS) {
+        break;
+      }
+
       let v = 1 - VAD_RESULT[xidx % RB_SIZE_FRAMING];
       //console.log(v);
       let y = v * canvas_fftSeries_mel.height;
@@ -448,7 +514,7 @@ const draw = function () {
 
 draw();
 
-// Create record buttons
+// Create record buttons for classification
 const record_btns_div = document.getElementById('record_btns');
 for (let idx = 0; idx < NCLASSES; idx++) {
   const btn = document.createElement('button');
@@ -461,8 +527,10 @@ for (let idx = 0; idx < NCLASSES; idx++) {
   record_btns_div.appendChild(label);
 }
 
+// Create record buttons for vad
 const record_btns_vad_div = document.getElementById('record_btns_vad');
-for (let idx = 0; idx < 2; idx++) {
+const N_VAD_CLASSES = 2;
+for (let idx = 0; idx < N_VAD_CLASSES; idx++) {
   const btn = document.createElement('button');
   btn.classList.add('record_btn_vad');
   btn.id = `vad class${idx + 1}`;
@@ -474,7 +542,7 @@ for (let idx = 0; idx < 2; idx++) {
 }
 
 /**
- * Get collection of buttons
+ * Get collection of buttons for classification
  */
 const record_btns_vad = document.getElementsByClassName('record_btn_vad');
 const record_btns = document.getElementsByClassName('record_btn');
@@ -537,7 +605,8 @@ for (let idx = 0; idx < record_btns.length; idx++) {
 }
 
 /**
- * extract snapshots of RECORDTIME from raw mel ringbuffer
+ * extract snapshots of about RECORDTIME from raw mel ringbuffer
+ * ... well take a number of snapshots
  */
 function record_vad(e, label) {
   //let endFrame = SERIES_POS;
@@ -580,7 +649,7 @@ for (let idx = 0; idx < record_btns_vad.length; idx++) {
     let N = 0;
     let intervall = setInterval(() => {
       N++;
-      if (N > 4) {
+      if (N >= VAD_N_SNAPSHOTS) {
         clearInterval(intervall);
         toggleRecordButtons_vad(false);
       }

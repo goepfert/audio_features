@@ -5,7 +5,9 @@ WORK in PROGRESS ... :)
 Demonstrator project featuring several technologies
 
 - Web Audio API
-- Direct Fourier Transformation
+- Mel
 - Convolutional Neural Network
-- 
+
+
+## Todo List
 
