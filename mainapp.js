@@ -51,7 +51,7 @@ let VAD_LAST_POS = 0;
 let tik = true;
 
 // Datasets
-const NCLASSES = 5; // How many classes to classify (normally, the first class refers to the background)
+const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
 const dataset = createDataset(NCLASSES, 0.2); // validation split
 const dataset_vad = createDataset(2, 0.2); // validation split
 let trained_data = undefined;
@@ -280,63 +280,63 @@ function doVAD() {
       //get voice activity in current frame
       let x = tf.tensor2d(VAD_IMG).reshape([1, VAD_SIZE, N_MEL_FILTER, 1]);
 
-      // model_vad
-      //   .predict(x)
-      //   .data()
-      //   .then((result) => {
-      //     let hit = false;
-      //     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-      //       if (curpos == vad_prevEndPos) {
-      //         hit = true;
-      //       }
-      //       if (!hit) {
-      //         //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
-      //         VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
-      //       } else {
-      //         //VAD_RESULT[curpos] = result[1];
-      //         VAD_RESULT[curpos] = r;
-      //       }
+      model_vad
+        .predict(x)
+        .data()
+        .then((result) => {
+          let hit = false;
+          for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+            if (curpos == vad_prevEndPos) {
+              hit = true;
+            }
+            if (!hit) {
+              VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
+              //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
+            } else {
+              VAD_RESULT[curpos] = result[1];
+              //VAD_RESULT[curpos] = r;
+            }
 
-      //       curpos++;
-      //       if (curpos >= RB_SIZE_FRAMING) {
-      //         curpos = 0;
-      //       }
-      //       if (curpos == endPos) {
-      //         break;
-      //       }
-      //     }
-      //     // do it in here :)
-      //     vad_prevEndPos = endPos;
-      //   })
-      //   .catch((err) => {
-      //     console.log(err);
-      //   });
+            curpos++;
+            if (curpos >= RB_SIZE_FRAMING) {
+              curpos = 0;
+            }
+            if (curpos == endPos) {
+              break;
+            }
+          }
+          // do it in here :)
+          vad_prevEndPos = endPos;
+        })
+        .catch((err) => {
+          console.log(err);
+        });
 
-      const res = model_vad.predict(x);
-      const result = res.dataSync();
-      let hit = false;
-      for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-        if (curpos == vad_prevEndPos) {
-          hit = true;
-        }
-        if (!hit) {
-          //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
-          VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
-        } else {
-          //VAD_RESULT[curpos] = result[1];
-          VAD_RESULT[curpos] = r;
-        }
+      // const res = model_vad.predict(x);
+      // const result = res.dataSync();
+      // let hit = false;
+      // for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+      //   if (curpos == vad_prevEndPos) {
+      //     hit = true;
+      //   }
+      //   if (!hit) {
+      //     VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
+      //     //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
+      //   } else {
+      //     VAD_RESULT[curpos] = result[1];
+      //     //VAD_RESULT[curpos] = r;
+      //   }
 
-        curpos++;
-        if (curpos >= RB_SIZE_FRAMING) {
-          curpos = 0;
-        }
-        if (curpos == endPos) {
-          break;
-        }
-      }
-      // do it in here :)
-      vad_prevEndPos = endPos;
+      //   curpos++;
+      //   if (curpos >= RB_SIZE_FRAMING) {
+      //     curpos = 0;
+      //   }
+      //   if (curpos == endPos) {
+      //     break;
+      //   }
+      // }
+      // // do it in here :)
+      // vad_prevEndPos = endPos;
     });
   }
 
@@ -829,7 +829,7 @@ predict_btn.addEventListener('click', () => {
     tf.tidy(() => {
       predict(Data_Pos);
     });
-  }, PRED_INTERVALL);
+  }, PRED_INTERVALL * 1000);
   //TODO: disable btn
 });
 

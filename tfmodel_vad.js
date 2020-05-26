@@ -40,7 +40,7 @@ function createNetwork_VAD(width, height, nClasses) {
       tf.layers.conv2d({
         kernelSize: [5, 5],
         padding: 'same', // TODO: check influence
-        filters: 32,
+        filters: 16,
         strides: 2,
         activation: 'relu',
         kernelInitializer: 'varianceScaling',
@@ -87,7 +87,7 @@ function createNetwork_VAD(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 20,
+      epochs: 10,
       shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,
