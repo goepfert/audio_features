@@ -45,10 +45,10 @@ const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
-const VAD_THRESHOLD = 0.8;
+const VAD_THRESHOLD = 0.7;
 const VAD_N_SNAPSHOTS = 10;
+const VAD_OVERLAP = 0.5;
 let VAD_LAST_POS = 0;
-let tik = true;
 
 // Datasets
 const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
@@ -73,7 +73,7 @@ const PRED_IMG = [];
 // no vad -> about 500 ms
 // with vad -> VAD_TIME ?
 //console.log(VAD_TIME);
-const PRED_INTERVALL = VAD_TIME;
+const PRED_INTERVALL = 750;
 
 //console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
 
@@ -243,7 +243,7 @@ function doVAD() {
   let curpos = vad_nextStartPos;
   let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
 
-  //console.log(vad_nextStartPos, endPos, vad_prevEndPos);
+  //console.log('a', vad_nextStartPos, endPos, vad_prevEndPos);
 
   // copy image
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
@@ -264,88 +264,48 @@ function doVAD() {
     utils.standardize(VAD_IMG);
   }
 
-  let r = 0.25;
-  if (tik) {
-    r = 0.75;
-    tik = false;
-  } else {
-    tik = true;
-  }
-
   // make vad prediction and fill result
   // do some averaging when overlapping (does not look very efficient though)
+  // and ... do it sychronously !!! otherwise the variables may get alterd after this fcn
   curpos = vad_nextStartPos;
   if (model_vad != undefined) {
     tf.tidy(() => {
       //get voice activity in current frame
       let x = tf.tensor2d(VAD_IMG).reshape([1, VAD_SIZE, N_MEL_FILTER, 1]);
 
-      model_vad
-        .predict(x)
-        .data()
-        .then((result) => {
-          let hit = false;
-          for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-            if (curpos == vad_prevEndPos) {
-              hit = true;
-            }
-            if (!hit) {
-              VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
-              //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
-            } else {
-              VAD_RESULT[curpos] = result[1];
-              //VAD_RESULT[curpos] = r;
-            }
+      const res = model_vad.predict(x);
+      const result = res.dataSync();
 
-            curpos++;
-            if (curpos >= RB_SIZE_FRAMING) {
-              curpos = 0;
-            }
-            if (curpos == endPos) {
-              break;
-            }
-          }
-          // do it in here :)
-          vad_prevEndPos = endPos;
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+      // console.log('b', vad_nextStartPos, endPos, vad_prevEndPos);
 
-      // const res = model_vad.predict(x);
-      // const result = res.dataSync();
-      // let hit = false;
-      // for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-      //   if (curpos == vad_prevEndPos) {
-      //     hit = true;
-      //   }
-      //   if (!hit) {
-      //     VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
-      //     //VAD_RESULT[curpos] = (VAD_RESULT[curpos] + r) / 2;
-      //   } else {
-      //     VAD_RESULT[curpos] = result[1];
-      //     //VAD_RESULT[curpos] = r;
-      //   }
+      let hit = false;
+      for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+        if (curpos == vad_prevEndPos) {
+          hit = true;
+        }
+        if (!hit) {
+          VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
+        } else {
+          VAD_RESULT[curpos] = result[1];
+        }
 
-      //   curpos++;
-      //   if (curpos >= RB_SIZE_FRAMING) {
-      //     curpos = 0;
-      //   }
-      //   if (curpos == endPos) {
-      //     break;
-      //   }
-      // }
-      // // do it in here :)
-      // vad_prevEndPos = endPos;
+        curpos++;
+        if (curpos >= RB_SIZE_FRAMING) {
+          curpos = 0;
+        }
+        if (curpos == endPos) {
+          break;
+        }
+        // do it in here :)
+        vad_prevEndPos = endPos;
+      }
     });
   }
 
+  // last
   VAD_LAST_POS = vad_nextStartPos + VAD_SIZE;
-  // about 50% overlap
-  vad_nextStartPos = Math.round(vad_nextStartPos + VAD_SIZE / 2);
-
-  // no overlap
-  //vad_nextStartPos = vad_nextStartPos + VAD_SIZE;
+  // new pos with some overlap
+  vad_nextStartPos = Math.round(vad_nextStartPos + VAD_OVERLAP * VAD_SIZE);
 
   vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
   VAD_LAST_POS = VAD_LAST_POS % RB_SIZE_FRAMING;
@@ -737,6 +697,7 @@ function predict(endFrame) {
     if (curpos >= RB_SIZE_FRAMING) {
       curpos = 0;
     }
+    // why not take VAD_LAST_POS
     if (curpos == endFrame) {
       break;
     }
@@ -744,6 +705,7 @@ function predict(endFrame) {
   vad /= size;
 
   if (vad < VAD_THRESHOLD) {
+    console.log('no voice activity detected:', vad);
     return;
   }
 
@@ -829,7 +791,7 @@ predict_btn.addEventListener('click', () => {
     tf.tidy(() => {
       predict(Data_Pos);
     });
-  }, PRED_INTERVALL * 1000);
+  }, PRED_INTERVALL);
   //TODO: disable btn
 });
 

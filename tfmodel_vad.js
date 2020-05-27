@@ -47,14 +47,14 @@ function createNetwork_VAD(width, height, nClasses) {
       })
     );
     model.add(tf.layers.flatten());
-    model.add(tf.layers.dropout({ rate: 0.25 }));
+    //model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
         units: 100,
         activation: 'relu',
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.5 }));
+    model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
         units: NUM_OUTPUT_CLASSES,
@@ -87,7 +87,7 @@ function createNetwork_VAD(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 10,
+      epochs: 20,
       shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,
