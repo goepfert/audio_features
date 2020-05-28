@@ -40,7 +40,7 @@ function createNetwork_VAD(width, height, nClasses) {
       tf.layers.conv2d({
         kernelSize: [5, 5],
         padding: 'same', // TODO: check influence
-        filters: 16,
+        filters: 32,
         strides: 2,
         activation: 'relu',
         kernelInitializer: 'varianceScaling',

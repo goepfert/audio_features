@@ -45,9 +45,9 @@ const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
-const VAD_THRESHOLD = 0.7;
+const VAD_THRESHOLD = 0.6;
 const VAD_N_SNAPSHOTS = 10;
-const VAD_OVERLAP = 0.5;
+const VAD_OVERLAP = 0;
 let VAD_LAST_POS = 0;
 
 // Datasets
@@ -73,7 +73,9 @@ const PRED_IMG = [];
 // no vad -> about 500 ms
 // with vad -> VAD_TIME ?
 //console.log(VAD_TIME);
-const PRED_INTERVALL = 750;
+const PRED_INTERVALL = 250;
+const PRED_SUSPEND = 4;
+let suspend = 1;
 
 //console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
 
@@ -305,7 +307,7 @@ function doVAD() {
   // last
   VAD_LAST_POS = vad_nextStartPos + VAD_SIZE;
   // new pos with some overlap
-  vad_nextStartPos = Math.round(vad_nextStartPos + VAD_OVERLAP * VAD_SIZE);
+  vad_nextStartPos = Math.round(vad_nextStartPos + (1 - VAD_OVERLAP) * VAD_SIZE);
 
   vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
   VAD_LAST_POS = VAD_LAST_POS % RB_SIZE_FRAMING;
@@ -690,62 +692,69 @@ function predict(endFrame) {
   let vad = 0;
   let size = 0;
   // likely that the last vad is not yet calculated
-  for (let idx = 0; idx < RECORD_SIZE_FRAMING - VAD_SIZE; idx++) {
+  for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
     vad += VAD_RESULT[curpos];
     curpos++;
     size++;
     if (curpos >= RB_SIZE_FRAMING) {
       curpos = 0;
     }
-    // why not take VAD_LAST_POS
-    if (curpos == endFrame) {
+    if (curpos == VAD_LAST_POS) {
       break;
     }
   }
   vad /= size;
 
-  if (vad < VAD_THRESHOLD) {
-    console.log('no voice activity detected:', vad);
-    return;
-  }
+  console.log(utils.getTime(), 'voice activity detected:', vad);
+  if (vad > VAD_THRESHOLD) {
+    suspend = PRED_SUSPEND;
 
-  console.log('voice activity detected:', vad);
+    let image = [];
+    curpos = startFrame;
+    for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
+      image[idx] = Array.from(LOG_MEL_RAW[curpos]);
+      PRED_IMG[idx] = Array.from(LOG_MEL[curpos]);
 
-  let image = [];
-  curpos = startFrame;
-  for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    image[idx] = Array.from(LOG_MEL_RAW[curpos]);
-    PRED_IMG[idx] = Array.from(LOG_MEL[curpos]);
-
-    curpos++;
-    if (curpos >= RB_SIZE_FRAMING) {
-      curpos = 0;
+      curpos++;
+      if (curpos >= RB_SIZE_FRAMING) {
+        curpos = 0;
+      }
+      if (curpos == endFrame) {
+        break;
+      }
     }
-    if (curpos == endFrame) {
-      break;
-    }
-  }
 
-  //check which what option the nn was trained!
-  if (MEAN_NORMALIZE) {
-    utils.meanNormalize(image);
+    //check which what option the nn was trained!
+    if (MEAN_NORMALIZE) {
+      utils.meanNormalize(image);
+    } else {
+      utils.standardize(image);
+    }
+
+    let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
+
+    utils.assert(model != undefined, 'not trained yet?');
+
+    model
+      .predict(x)
+      .data()
+      .then((result) => {
+        showPrediction(result);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+
+    x.dispose();
   } else {
-    utils.standardize(image);
+    suspend = 1;
   }
 
-  let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
-
-  utils.assert(model != undefined, 'not trained yet?');
-
-  model
-    .predict(x)
-    .data()
-    .then((result) => {
-      showPrediction(result);
-    })
-    .catch((err) => {
-      console.log(err);
+  setTimeout(() => {
+    tf.tidy(() => {
+      predict(Data_Pos);
     });
+  }, PRED_INTERVALL * suspend);
 }
 
 function showPrediction(result) {
@@ -753,6 +762,7 @@ function showPrediction(result) {
   utils.assert(result.length == inputs.length);
 
   const maxIdx = utils.indexOfMax(result);
+  console.log('top result', maxIdx, result[maxIdx]);
 
   let list = document.getElementById('result');
   list.innerHTML = '';
@@ -787,11 +797,15 @@ function showPrediction(result) {
 }
 
 predict_btn.addEventListener('click', () => {
-  setInterval(() => {
-    tf.tidy(() => {
-      predict(Data_Pos);
-    });
-  }, PRED_INTERVALL);
+  // setInterval(() => {
+  //   tf.tidy(() => {
+  //     predict(Data_Pos);
+  //   });
+  // }, PRED_INTERVALL * suspend);
+
+  tf.tidy(() => {
+    predict(Data_Pos);
+  });
   //TODO: disable btn
 });
 
