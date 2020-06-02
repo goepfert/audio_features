@@ -8,6 +8,7 @@ Demonstrator project featuring several technologies
 - Mel
 - Convolutional Neural Network
 
-
 ## Todo List
 
+- VAD meter
+- why are still some tensors left after training (w/o prediction)

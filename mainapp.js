@@ -56,6 +56,8 @@ const dataset = createDataset(NCLASSES, 0.2); // validation split
 const dataset_vad = createDataset(2, 0.2); // validation split
 let trained_data = undefined;
 let trained_data_vad = undefined;
+let is_trained = false;
+let is_trained_vad = false;
 
 // Data augmentation
 const N_AUG = 4;
@@ -656,6 +658,7 @@ train_btn.addEventListener('click', async () => {
   tfvis.show.modelSummary({ name: 'Model Summary' }, model);
   trained_data = dataset.getData();
   await nn.train(trained_data.x, trained_data.y, model);
+  is_trained = true;
   console.log('training finished');
 
   togglePredictButton(false);
@@ -671,6 +674,7 @@ train_btn_vad.addEventListener('click', async () => {
   tfvis.show.modelSummary({ name: 'Model Summary' }, model_vad);
   trained_data_vad = dataset_vad.getData();
   await nn_vad.train(trained_data_vad.x, trained_data_vad.y, model_vad);
+  is_trained_vad = true;
   console.log('training finished');
 
   //TODO: toggleAccuracy
@@ -851,6 +855,24 @@ save_btn.addEventListener('click', () => {
 const load_btn = document.getElementById('load_btn');
 load_btn.addEventListener('click', () => {
   inputs = Store.getData('data');
+});
+
+const save_model_btn_vad = document.getElementById('save_model_btn_vad');
+save_model_btn_vad.addEventListener('click', async () => {
+  utils.assert(model_vad != undefined, 'vad model undefined');
+  utils.assert(is_trained_vad == true, 'not trained yet?');
+  console.log(await model_vad.save('downloads://vad_model'));
+});
+
+const load_model_btn_vad = document.getElementById('load_model_btn_vad');
+load_model_btn_vad.addEventListener('click', async () => {
+  utils.assert(model_vad == undefined, 'vad model already defined');
+  utils.assert(is_trained_vad == false, 'already trained?');
+
+  const uploadJSONInput = document.getElementById('upload-json');
+  const uploadWeightsInput = document.getElementById('upload-weights');
+  model_vad = await tf.loadLayersModel(tf.io.browserFiles([uploadJSONInput.files[0], uploadWeightsInput.files[0]]));
+  console.log(model_vad);
 });
 
 /**

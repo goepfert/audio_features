@@ -47,10 +47,10 @@ function createNetwork_VAD(width, height, nClasses) {
       })
     );
     model.add(tf.layers.flatten());
-    //model.add(tf.layers.dropout({ rate: 0.25 }));
+    model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(
       tf.layers.dense({
-        units: 100,
+        units: 200,
         activation: 'relu',
       })
     );
