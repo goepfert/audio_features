@@ -68,7 +68,7 @@ const generator = createImageDataGenerator(opt);
 // Neural Network
 let nn; // defined later
 let model;
-const nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2); ; // defined later
+const nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2);
 let model_vad;
 const MEAN_NORMALIZE = true; // false -> standardize
 const PRED_IMG = [];
@@ -669,12 +669,12 @@ train_btn.addEventListener('click', async () => {
  * Create Network for VAD and attach training to training button
  */
 train_btn_vad.addEventListener('click', async () => {
-
-  
-  if(model_vad == undefined) {
+  if (model_vad == undefined) {
     model_vad = nn_vad.getModel();
   } else {
-    nn_vad.freezeModelforTransferLearning(model_vad);
+    //nn_vad.freezeModelforTransferLearning(model_vad);
+    console.log('continue training with new dataset');
+    nn_vad.compile_model(model_vad);
   }
 
   tfvis.show.modelSummary({ name: 'Model Summary' }, model_vad);
@@ -867,7 +867,8 @@ const save_model_btn_vad = document.getElementById('save_model_btn_vad');
 save_model_btn_vad.addEventListener('click', async () => {
   utils.assert(model_vad != undefined, 'vad model undefined');
   utils.assert(is_trained_vad == true, 'not trained yet?');
-  console.log(await model_vad.save('downloads://vad_model'));
+  const filename = document.getElementById('vad_model_name').value;
+  console.log(await model_vad.save(`downloads://${filename}`));
 });
 
 const load_model_btn_vad = document.getElementById('load_model_btn_vad');
@@ -877,7 +878,9 @@ load_model_btn_vad.addEventListener('click', async () => {
 
   const uploadJSONInput = document.getElementById('upload-json');
   const uploadWeightsInput = document.getElementById('upload-weights');
+  console.log('loading:', uploadJSONInput.files[0].name, uploadWeightsInput.files[0].name);
   model_vad = await tf.loadLayersModel(tf.io.browserFiles([uploadJSONInput.files[0], uploadWeightsInput.files[0]]));
+  //model_vad = await tf.loadLayersModel(tf.io.browserFiles(uploadJSONInput.files[0]));
   console.log(model_vad);
 });
 
@@ -932,5 +935,58 @@ async function showConfusion() {
   labels.dispose();
 }
 
+/**
+ * Accuracy and Confusion Matrix Vad
+ */
+function doPrediction_vad() {
+  utils.assert(trained_data_vad != undefined, 'not trained');
+
+  const testxs = trained_data_vad.x_validation;
+  const labels = trained_data_vad.y_validation.argMax([-1]);
+  const preds = model_vad.predict(testxs).argMax([-1]);
+  testxs.dispose();
+  return [preds, labels];
+}
+
+async function showAccuracy_vad() {
+  const [preds, labels] = doPrediction_vad();
+
+  const classAccuracy = await tfvis.metrics.perClassAccuracy(labels, preds);
+  const container = {
+    name: 'Accuracy VAD',
+    tab: 'Evaluation',
+  };
+
+  let classNames = [];
+  const inputs = dataset_vad.getInputs();
+  for (let idx = 0; idx < inputs.length; idx++) {
+    classNames.push(inputs[idx].label);
+  }
+
+  tfvis.show.perClassAccuracy(container, classAccuracy, classNames);
+  labels.dispose();
+}
+
+async function showConfusion_vad() {
+  const [preds, labels] = doPrediction_vad();
+  const confusionMatrix = await tfvis.metrics.confusionMatrix(labels, preds);
+  const container = {
+    name: 'Confusion Matrix VAD',
+    tab: 'Evaluation',
+  };
+  let classNames = [];
+  const inputs = dataset_vad.getInputs();
+  for (let idx = 0; idx < inputs.length; idx++) {
+    classNames.push(inputs[idx].label);
+  }
+  tfvis.render.confusionMatrix(container, {
+    values: confusionMatrix,
+    tickLabels: classNames,
+  });
+  labels.dispose();
+}
+
 document.querySelector('#show-accuracy').addEventListener('click', () => showAccuracy());
 document.querySelector('#show-confusion').addEventListener('click', () => showConfusion());
+document.querySelector('#show-accuracy-vad').addEventListener('click', () => showAccuracy_vad());
+document.querySelector('#show-confusion-vad').addEventListener('click', () => showConfusion_vad());

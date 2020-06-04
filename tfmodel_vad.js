@@ -110,6 +110,7 @@ function createNetwork_VAD(width, height, nClasses) {
   return {
     getModel: getModel,
     train: train,
-    freezeModelforTransferLearning: freezeModelforTransferLearning
+    freezeModelforTransferLearning: freezeModelforTransferLearning,
+    compile_model: compile_model,
   };
 }
