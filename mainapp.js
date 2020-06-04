@@ -45,9 +45,9 @@ const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
-const VAD_THRESHOLD = 0.6;
+const VAD_THRESHOLD = 0.7;
 const VAD_N_SNAPSHOTS = 10;
-const VAD_OVERLAP = 0;
+const VAD_OVERLAP = 0.5;
 let VAD_LAST_POS = 0;
 
 // Datasets
@@ -68,7 +68,7 @@ const generator = createImageDataGenerator(opt);
 // Neural Network
 let nn; // defined later
 let model;
-let nn_vad; // defined later
+const nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2); ; // defined later
 let model_vad;
 const MEAN_NORMALIZE = true; // false -> standardize
 const PRED_IMG = [];
@@ -669,8 +669,14 @@ train_btn.addEventListener('click', async () => {
  * Create Network for VAD and attach training to training button
  */
 train_btn_vad.addEventListener('click', async () => {
-  nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2);
-  model_vad = nn_vad.getModel();
+
+  
+  if(model_vad == undefined) {
+    model_vad = nn_vad.getModel();
+  } else {
+    nn_vad.freezeModelforTransferLearning(model_vad);
+  }
+
   tfvis.show.modelSummary({ name: 'Model Summary' }, model_vad);
   trained_data_vad = dataset_vad.getData();
   await nn_vad.train(trained_data_vad.x, trained_data_vad.y, model_vad);

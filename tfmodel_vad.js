@@ -63,14 +63,27 @@ function createNetwork_VAD(width, height, nClasses) {
       })
     );
 
+    compile_model(model);
+
+    return model;
+  }
+
+  function compile_model(model) {
     const optimizer = tf.train.adam();
     model.compile({
       optimizer: optimizer,
       loss: 'categoricalCrossentropy',
       metrics: ['accuracy'],
     });
+  }
 
-    return model;
+  function freezeModelforTransferLearning(model) {
+    console.log('Freezing feature layers of the model.');
+    for (let i = 0; i < 5; ++i) {
+      model.layers[i].trainable = false;
+    }
+
+    compile_model(model);
   }
 
   async function train(xs, ys, model) {
@@ -97,5 +110,6 @@ function createNetwork_VAD(width, height, nClasses) {
   return {
     getModel: getModel,
     train: train,
+    freezeModelforTransferLearning: freezeModelforTransferLearning
   };
 }
