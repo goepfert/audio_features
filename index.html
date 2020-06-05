@@ -14,21 +14,32 @@
     <canvas id="fft-series mel" height="0"></canvas><br />
     <canvas id="fft-series pred" height="0"></canvas>
 
+
+    <br> <br>
+    <button class="load_model_btn_vad" id="load_model_btn_vad">Load Model VAD</button>
+    <input type="file" id="upload-json" />
+    <input type="file" id="upload-weights" /> 
+    <br>
+    <button class="load_data_btn_vad" id="load_data_btn_vad">Load Data VAD</button>
+    <input type="file" id="download-data-vad" />
+    <br> <br>
+
     <div id="record_btns_vad"></div>
     <button class="train_btn_vad" id="train_btn_vad">Train VAD</button><br />
     <button id="show-accuracy-vad">Show Accuracy</button>
-    <button id="show-confusion-vad">Show Confusion Matrix</button><br />
+    <button id="show-confusion-vad">Show Confusion Matrix</button>
+    <br />
+    <br>
 
     <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
+    <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
     <form>
-      <label for="vad_model">Modelname:</label>
+      <label for="vad_model">name:</label>
       <input type="text" id="vad_model_name" value="vad_model" />
     </form>
 
     <br />
-    <button class="load_model_btn_vad" id="load_model_btn_vad">Load Model VAD</button>
-    <input type="file" id="upload-json" />
-    <input type="file" id="upload-weights" />
+    
     <br />
 
     <br />

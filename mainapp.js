@@ -871,6 +871,14 @@ save_model_btn_vad.addEventListener('click', async () => {
   console.log(await model_vad.save(`downloads://${filename}`));
 });
 
+const save_data_btn_vad = document.getElementById('save_data_btn_vad');
+save_data_btn_vad.addEventListener('click', async () => {
+  const filename = document.getElementById('vad_model_name').value;
+  const inputs = dataset_vad.getInputs();
+  console.log('saving vad data:', inputs.length);
+  utils.download(JSON.stringify(inputs), `${filename}`, 'text/plain');
+});
+
 const load_model_btn_vad = document.getElementById('load_model_btn_vad');
 load_model_btn_vad.addEventListener('click', async () => {
   utils.assert(model_vad == undefined, 'vad model already defined');
@@ -882,6 +890,26 @@ load_model_btn_vad.addEventListener('click', async () => {
   model_vad = await tf.loadLayersModel(tf.io.browserFiles([uploadJSONInput.files[0], uploadWeightsInput.files[0]]));
   //model_vad = await tf.loadLayersModel(tf.io.browserFiles(uploadJSONInput.files[0]));
   console.log(model_vad);
+});
+
+const load_data_btn_vad = document.getElementById('load_data_btn_vad');
+load_data_btn_vad.addEventListener('click', async () => {
+  console.log('click');
+  const downloadJSONInput = document.getElementById('download-data-vad');
+});
+
+const downloadJSONInput_vad = document.getElementById('download-data-vad');
+downloadJSONInput_vad.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  console.log(file);
+
+  const reader = new FileReader();
+  reader.addEventListener('load', (event) => {
+    let res = JSON.parse(event.target.result);
+    console.log(res);
+  });
+  reader.readAsDataURL(file);
+
 });
 
 /**
