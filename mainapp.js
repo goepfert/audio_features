@@ -1,6 +1,13 @@
 // It all starts with a context
 //const context = new AudioContext({ samplerate: 48000 });
-const context = new AudioContext();
+let context = new AudioContext();
+
+// Existing code unchanged.
+// window.onload = function() {
+//   context = new AudioContext();
+//   // Setup all nodes
+// }
+
 const samplerate = context.sampleRate;
 
 // Buffer sizes
@@ -52,8 +59,8 @@ let VAD_LAST_POS = 0;
 
 // Datasets
 const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
-const dataset = createDataset(NCLASSES, 0.2); // validation split
-const dataset_vad = createDataset(2, 0.2); // validation split
+const dataset = createDataset(NCLASSES, undefined, undefined, 0.2); // validation split
+const dataset_vad = createDataset(2, VAD_SIZE, N_MEL_FILTER, 0.2); // validation split
 let trained_data = undefined;
 let trained_data_vad = undefined;
 let is_trained = false;
@@ -661,6 +668,9 @@ train_btn.addEventListener('click', async () => {
   is_trained = true;
   console.log('training finished');
 
+  showAccuracy();
+  showConfusion();
+
   togglePredictButton(false);
   //TODO: toggleAccuracy
 });
@@ -669,6 +679,7 @@ train_btn.addEventListener('click', async () => {
  * Create Network for VAD and attach training to training button
  */
 train_btn_vad.addEventListener('click', async () => {
+
   if (model_vad == undefined) {
     model_vad = nn_vad.getModel();
   } else {
@@ -683,6 +694,8 @@ train_btn_vad.addEventListener('click', async () => {
   is_trained_vad = true;
   console.log('training finished');
 
+  showAccuracy_vad();
+  showConfusion_vad();
   //TODO: toggleAccuracy
 });
 
@@ -853,16 +866,10 @@ showImages_btn.addEventListener('click', async () => {
   }
 });
 
-const save_btn = document.getElementById('save_btn');
-save_btn.addEventListener('click', () => {
-  Store.saveData(inputs, 'data');
-});
 
-const load_btn = document.getElementById('load_btn');
-load_btn.addEventListener('click', () => {
-  inputs = Store.getData('data');
-});
-
+/**
+ * save VAD model to file
+ */
 const save_model_btn_vad = document.getElementById('save_model_btn_vad');
 save_model_btn_vad.addEventListener('click', async () => {
   utils.assert(model_vad != undefined, 'vad model undefined');
@@ -871,6 +878,25 @@ save_model_btn_vad.addEventListener('click', async () => {
   console.log(await model_vad.save(`downloads://${filename}`));
 });
 
+
+/**
+ * load VAD model
+ */
+const load_model_file_vad = document.getElementById('download-model-vad');
+load_model_file_vad.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  utils.assert(model_vad == undefined, 'vad model already defined?'); //overwrite????
+  utils.assert(is_trained_vad == false, 'vad model already trained?');
+  console.log('loading vad model from', file.name);
+  model_vad = await tf.loadLayersModel(tf.io.browserFiles([file])); // WEIGHTS???????????????
+  console.log(model_vad);
+});
+
+
+/** 
+ * save recorded vad images
+ * can be loaded and extended for further training
+ */
 const save_data_btn_vad = document.getElementById('save_data_btn_vad');
 save_data_btn_vad.addEventListener('click', async () => {
   const filename = document.getElementById('vad_model_name').value;
@@ -879,37 +905,25 @@ save_data_btn_vad.addEventListener('click', async () => {
   utils.download(JSON.stringify(inputs), `${filename}`, 'text/plain');
 });
 
-const load_model_btn_vad = document.getElementById('load_model_btn_vad');
-load_model_btn_vad.addEventListener('click', async () => {
-  utils.assert(model_vad == undefined, 'vad model already defined');
-  utils.assert(is_trained_vad == false, 'already trained?');
-
-  const uploadJSONInput = document.getElementById('upload-json');
-  const uploadWeightsInput = document.getElementById('upload-weights');
-  console.log('loading:', uploadJSONInput.files[0].name, uploadWeightsInput.files[0].name);
-  model_vad = await tf.loadLayersModel(tf.io.browserFiles([uploadJSONInput.files[0], uploadWeightsInput.files[0]]));
-  //model_vad = await tf.loadLayersModel(tf.io.browserFiles(uploadJSONInput.files[0]));
-  console.log(model_vad);
-});
-
-const load_data_btn_vad = document.getElementById('load_data_btn_vad');
-load_data_btn_vad.addEventListener('click', async () => {
-  console.log('click');
-  const downloadJSONInput = document.getElementById('download-data-vad');
-});
-
-const downloadJSONInput_vad = document.getElementById('download-data-vad');
-downloadJSONInput_vad.addEventListener('change', (e) => {
+/**
+ * Load previously recorded VAD images
+ * clear all currently recorded images !
+ * has to be the same number of classes and dimension
+ */
+const load_data_file_vad = document.getElementById('download-data-vad');
+load_data_file_vad.addEventListener('change', (e) => {
   const file = e.target.files[0];
-  console.log(file);
-
+  console.log('loading vad date from', file.name);
   const reader = new FileReader();
   reader.addEventListener('load', (event) => {
-    let res = JSON.parse(event.target.result);
-    console.log(res);
+    let res = event.target.result;
+    let textByLine = res.split("\n");
+    let newInputs = JSON.parse(textByLine);
+    dataset_vad.clearInputs();
+    dataset_vad.setInputs(newInputs);
   });
-  reader.readAsDataURL(file);
-
+  //reader.readAsDataURL(file);
+  reader.readAsText(file);
 });
 
 /**

@@ -2,12 +2,12 @@
  *
  */
 
-function createDataset(num_classes, fraction_validation) {
+function createDataset(num_classes, img_width, img_height, fraction_validation) {
   let _num_classes = num_classes;
   let _fraction_validation = fraction_validation;
   let _inputs = [];
-  let _img_width = undefined;
-  let _img_height = undefined;
+  let _img_width = img_width;
+  let _img_height = img_height;
 
   (function init() {
     for (let idx = 0; idx < _num_classes; idx++) {
@@ -120,8 +120,27 @@ function createDataset(num_classes, fraction_validation) {
     return _inputs[index].data.length;
   }
 
-  function getInputs(params) {
+  function getInputs() {
     return _inputs;
+  }
+
+  function clearInputs() {
+    _inputs = [];
+    console.log('clearing inputs');
+  }
+
+  function setInputs(inputs) {
+    console.log('setting new inputs');
+    _inputs = inputs;
+    printInfo(_inputs);
+  }
+
+  function printInfo() {
+    console.log('number of classes:', _inputs.length);
+    for (let idx = 0; idx < _inputs.length; idx++) {
+      console.log('class idx', idx, ', class label', _inputs[idx].label);
+      console.log('number of images in class label', _inputs[idx].data.length);
+    }
   }
 
   return {
@@ -129,5 +148,7 @@ function createDataset(num_classes, fraction_validation) {
     getData: getData,
     getNumImages: getNumImages,
     getInputs: getInputs,
+    clearInputs: clearInputs,
+    setInputs: setInputs,
   };
 }

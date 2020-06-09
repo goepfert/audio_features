@@ -16,12 +16,10 @@
 
 
     <br> <br>
-    <button class="load_model_btn_vad" id="load_model_btn_vad">Load Model VAD</button>
-    <input type="file" id="upload-json" />
-    <input type="file" id="upload-weights" /> 
+    <h3>Voice Activity Detection</h3>
+    Load Model: <input type="file" value="" id="download-model-vad" accept=".json" />
     <br>
-    <button class="load_data_btn_vad" id="load_data_btn_vad">Load Data VAD</button>
-    <input type="file" id="download-data-vad" />
+    Load Data: <input type="file" value="" id="download-data-vad" accept=".txt"/>
     <br> <br>
 
     <div id="record_btns_vad"></div>
@@ -31,18 +29,17 @@
     <br />
     <br>
 
-    <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
-    <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
     <form>
       <label for="vad_model">name:</label>
       <input type="text" id="vad_model_name" value="vad_model" />
     </form>
+    <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
+    <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
 
     <br />
-    
     <br />
 
-    <br />
+    <h3>Speech Recognition</h3>
     <div id="record_btns"></div>
     <!-- TODO: create button dynamically -->
     <!-- <button class="record_btn" id="class1">Record Class1</button>
@@ -56,7 +53,6 @@
     <button id="showImages_btn">Show Records</button><br />
     <button class="train_btn" id="train_btn">Train</button><br />
     <button class="predict_btn" id="predict_btn">Predict</button><br />
-    <button id="save_btn">Save</button><button id="load_btn">Load</button><br />
     <button id="show-accuracy">Show Accuracy</button>
     <button id="show-confusion">Show Confusion Matrix</button>
     <div class="predict" id="predict">
