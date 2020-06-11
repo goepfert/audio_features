@@ -12,14 +12,18 @@
     <canvas id="oscilloscope" height="0"></canvas><br />
     <canvas id="fft-series" height="0"></canvas><br />
     <canvas id="fft-series mel" height="0"></canvas><br />
-    <canvas id="fft-series pred" height="0"></canvas>
-
+    <canvas id="fft-series pred" height="0"></canvas> <br>
+    <canvas id="vad meter" height="0"></canvas>
 
     <br> <br>
     <h3>Voice Activity Detection</h3>
-    Load Model: <input type="file" value="" id="download-model-vad" accept=".json" />
+    <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display:none;"/>
+    <label for="download-model-vad" class="custom-button">Load model</label>
+    <label for="download-model-vad">not selected</label>
     <br>
-    Load Data: <input type="file" value="" id="download-data-vad" accept=".txt"/>
+    <input type="file" value="" id="download-data-vad" accept=".txt" style="display:none;"/>
+    <label for="download-data-vad" class="custom-button">Load data</label>
+    <label for="download-data-vad">not selected</label>
     <br> <br>
 
     <div id="record_btns_vad"></div>

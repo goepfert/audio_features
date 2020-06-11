@@ -1,6 +1,11 @@
 // It all starts with a context
 //const context = new AudioContext({ samplerate: 48000 });
-let context = new AudioContext();
+let context;
+
+window.onload = function() {
+  console.log('loaded');
+  context = new AudioContext();
+}
 
 // Existing code unchanged.
 // window.onload = function() {
@@ -56,6 +61,7 @@ const VAD_THRESHOLD = 0.7;
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
 let VAD_LAST_POS = 0;
+let VAD_AVERAGE = 0;
 
 // Datasets
 const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
@@ -129,6 +135,8 @@ let canvas_fftSeries_mel;
 let context_fftSeries_mel;
 let canvas_fftSeries_pred;
 let context_fftSeries_pred;
+let canvas_vad_meter;
+let context_vad_meter;
 (function create_some_stuff() {
   if (drawit[0]) {
     canvas = document.getElementById('oscilloscope');
@@ -156,6 +164,11 @@ let context_fftSeries_pred;
     context_fftSeries_pred = canvas_fftSeries_pred.getContext('2d');
     canvas_fftSeries_pred.width = 4 * RB_SIZE_FRAMING;
     canvas_fftSeries_pred.height = 4 * N_MEL_FILTER;
+
+    canvas_vad_meter = document.getElementById('vad meter');
+    context_vad_meter = canvas_vad_meter.getContext('2d');
+    canvas_vad_meter.width = canvas_fftSeries_pred.width;
+    canvas_vad_meter.height = 40;
   }
 })();
 
@@ -320,6 +333,35 @@ function doVAD() {
 
   vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
   VAD_LAST_POS = VAD_LAST_POS % RB_SIZE_FRAMING;
+
+  averageVAD(Data_Pos);
+
+  //console.log(VAD_AVERAGE);
+}
+
+function averageVAD(endPos) {
+  // some averaging
+  let startFrame = endPos - RECORD_SIZE_FRAMING;
+  if (startFrame < 0) {
+    startFrame = RB_SIZE_FRAMING + startFrame;
+  }
+
+  // check for voice activity
+  let curpos = startFrame;
+  let size = 0;
+  // likely that the last vad is not yet calculated
+  for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
+    VAD_AVERAGE += VAD_RESULT[curpos];
+    curpos++;
+    size++;
+    if (curpos >= RB_SIZE_FRAMING) {
+      curpos = 0;
+    }
+    if (curpos == VAD_LAST_POS) {
+      break;
+    }
+  }
+  VAD_AVERAGE /= size;
 }
 
 /**
@@ -475,6 +517,17 @@ const draw = function () {
       canvas_fftSeries_pred.width,
       canvas_fftSeries_pred.height
     );
+
+    rectHeight = canvas_vad_meter.height;
+    rectWidth = canvas_vad_meter.width;
+    context_vad_meter.clearRect(0, 0, rectWidth, rectHeight);
+    if(VAD_AVERAGE > VAD_THRESHOLD) {
+      context_vad_meter.fillStyle = "red";
+    } else {
+      context_vad_meter.fillStyle = "green";
+    }
+    context_vad_meter.fillRect(0, 0, VAD_AVERAGE * rectWidth, rectHeight);
+
   }
 
   // draw asap ... but wait some time to get other things done
@@ -710,26 +763,8 @@ function predict(endFrame) {
     startFrame = RB_SIZE_FRAMING + startFrame;
   }
 
-  // check for voice activity
-  let curpos = startFrame;
-  let vad = 0;
-  let size = 0;
-  // likely that the last vad is not yet calculated
-  for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    vad += VAD_RESULT[curpos];
-    curpos++;
-    size++;
-    if (curpos >= RB_SIZE_FRAMING) {
-      curpos = 0;
-    }
-    if (curpos == VAD_LAST_POS) {
-      break;
-    }
-  }
-  vad /= size;
-
   console.log(utils.getTime(), 'voice activity detected:', vad);
-  if (vad > VAD_THRESHOLD) {
+  if (VAD_AVERAGE > VAD_THRESHOLD) {
     suspend = PRED_SUSPEND;
 
     let image = [];
@@ -881,14 +916,32 @@ save_model_btn_vad.addEventListener('click', async () => {
 
 /**
  * load VAD model
+ * user has to select json and bin file
  */
 const load_model_file_vad = document.getElementById('download-model-vad');
 load_model_file_vad.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
+
+  utils.assert(e.target.files.length == 2, "select one json and one bin file for model");
+  e.target.labels[1].innerHTML = '';
+
+  let jsonFile;
+  let binFile;
+
+  if(e.target.files[0].name.split('.').pop() == 'json' ) {
+    jsonFile = e.target.files[0];
+    binFile = e.target.files[1];
+  } else {
+    jsonFile = e.target.files[1];
+    binFile = e.target.files[0];
+  }
+  
   utils.assert(model_vad == undefined, 'vad model already defined?'); //overwrite????
   utils.assert(is_trained_vad == false, 'vad model already trained?');
-  console.log('loading vad model from', file.name);
-  model_vad = await tf.loadLayersModel(tf.io.browserFiles([file])); // WEIGHTS???????????????
+  console.log('loading vad model from', jsonFile.name, binFile.name);
+
+  e.target.labels[1].innerHTML = jsonFile.name + ', ' + binFile.name;
+
+  model_vad = await tf.loadLayersModel(tf.io.browserFiles([jsonFile, binFile]));
   console.log(model_vad);
 });
 
@@ -921,6 +974,7 @@ load_data_file_vad.addEventListener('change', (e) => {
     let newInputs = JSON.parse(textByLine);
     dataset_vad.clearInputs();
     dataset_vad.setInputs(newInputs);
+    e.target.labels[1].innerHTML = file.name;
   });
   //reader.readAsDataURL(file);
   reader.readAsText(file);

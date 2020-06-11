@@ -207,6 +207,17 @@ const utils = (function () {
     a.click();
   }
 
+  function sleep(milliseconds) {
+
+    
+
+    const date = Date.now();
+    let currentDate = null;
+    do {
+      currentDate = Date.now();
+    } while (currentDate - date < milliseconds);
+  }
+
   return {
     grayscale: _grayscale,
     rainbow: _rainbow,
@@ -226,6 +237,7 @@ const utils = (function () {
     minMaxNormalize: minMaxNormalize,
     standardize: standardize,
     getTime: getTime,
-    download: download
+    download: download,
+    sleep: sleep,
   };
 })();
