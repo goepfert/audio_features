@@ -1,17 +1,5 @@
 // It all starts with a context
-//const context = new AudioContext({ samplerate: 48000 });
-let context;
-
-window.onload = function() {
-  console.log('loaded');
-  context = new AudioContext();
-}
-
-// Existing code unchanged.
-// window.onload = function() {
-//   context = new AudioContext();
-//   // Setup all nodes
-// }
+const context = new AudioContext({ samplerate: 48000 });
 
 const samplerate = context.sampleRate;
 
@@ -57,7 +45,8 @@ const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
-const VAD_THRESHOLD = 0.7;
+const VAD_THRESHOLD = -1; //0.7;
+const TRESHOLD = 0.9;
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
 let VAD_LAST_POS = 0;
@@ -126,7 +115,7 @@ for (let idx = 0; idx < VAD_SIZE; idx++) {
 }
 
 // Canvas width and height
-let drawit = [false, false, true, true];
+let drawit = [false, false, true, true, true];
 let canvas;
 let canvasCtx;
 let canvas_fftSeries;
@@ -137,6 +126,8 @@ let canvas_fftSeries_pred;
 let context_fftSeries_pred;
 let canvas_vad_meter;
 let context_vad_meter;
+let canvas_pred_meter = [];
+let context_pred_meter = [];
 (function create_some_stuff() {
   if (drawit[0]) {
     canvas = document.getElementById('oscilloscope');
@@ -165,10 +156,32 @@ let context_vad_meter;
     canvas_fftSeries_pred.width = 4 * RB_SIZE_FRAMING;
     canvas_fftSeries_pred.height = 4 * N_MEL_FILTER;
 
+  }
+
+  if (drawit[4]) {
     canvas_vad_meter = document.getElementById('vad meter');
     context_vad_meter = canvas_vad_meter.getContext('2d');
     canvas_vad_meter.width = canvas_fftSeries_pred.width;
     canvas_vad_meter.height = 40;
+
+    //create pred canvas dynamically
+    const container = document.getElementById('pred meter container');
+    for (let classIdx = 0; classIdx < NCLASSES; classIdx++) {
+
+      let canvas = document.createElement('canvas');
+      canvas.width = 4 * RB_SIZE_FRAMING;
+      canvas.height = 40;
+      canvas.id = `pred class${classIdx + 1}`;
+      const label = document.createElement('label');
+      label.innerHTML = `class${classIdx + 1}`;
+      label.htmlFor = `pred class${classIdx + 1}`;
+      let context = canvas.getContext('2d');
+      container.appendChild(label);
+      container.appendChild(canvas);
+      container.appendChild(document.createElement('br'))
+      canvas_pred_meter.push(canvas);
+      context_pred_meter.push(context);
+    }
   }
 })();
 
@@ -339,6 +352,9 @@ function doVAD() {
   //console.log(VAD_AVERAGE);
 }
 
+/** 
+ * average VAD over the record size
+ */
 function averageVAD(endPos) {
   // some averaging
   let startFrame = endPos - RECORD_SIZE_FRAMING;
@@ -517,17 +533,19 @@ const draw = function () {
       canvas_fftSeries_pred.width,
       canvas_fftSeries_pred.height
     );
+  }
 
-    rectHeight = canvas_vad_meter.height;
-    rectWidth = canvas_vad_meter.width;
+  // VAD Meter
+  if (drawit[4]) {
+    const rectHeight = canvas_vad_meter.height;
+    const rectWidth = canvas_vad_meter.width;
     context_vad_meter.clearRect(0, 0, rectWidth, rectHeight);
-    if(VAD_AVERAGE > VAD_THRESHOLD) {
+    if (VAD_AVERAGE > VAD_THRESHOLD) {
       context_vad_meter.fillStyle = "red";
     } else {
       context_vad_meter.fillStyle = "green";
     }
     context_vad_meter.fillRect(0, 0, VAD_AVERAGE * rectWidth, rectHeight);
-
   }
 
   // draw asap ... but wait some time to get other things done
@@ -763,7 +781,7 @@ function predict(endFrame) {
     startFrame = RB_SIZE_FRAMING + startFrame;
   }
 
-  console.log(utils.getTime(), 'voice activity detected:', vad);
+  console.log(utils.getTime(), 'voice activity detected:', VAD_AVERAGE);
   if (VAD_AVERAGE > VAD_THRESHOLD) {
     suspend = PRED_SUSPEND;
 
@@ -821,7 +839,7 @@ function showPrediction(result) {
 
   const maxIdx = utils.indexOfMax(result);
   console.log('top result', maxIdx, result[maxIdx]);
-
+  
   let list = document.getElementById('result');
   list.innerHTML = '';
 
@@ -835,10 +853,21 @@ function showPrediction(result) {
     span.appendChild(textNode);
     entry.appendChild(span);
     list.appendChild(entry);
+
+    const rectHeight = canvas_pred_meter[idx].height;
+    const rectWidth = canvas_pred_meter[idx].width;
+    context_pred_meter[idx].clearRect(0, 0, rectWidth, rectHeight);
+    
+    if (result[idx] > VAD_THRESHOLD) {
+      context_pred_meter[idx].fillStyle = "red";
+    } else {
+      context_pred_meter[idx].fillStyle = "green";
+    }
+    context_pred_meter[idx].fillRect(0, 0, result[idx] * rectWidth, rectHeight);
   }
 
   //
-  const TRESHOLD = 0.9;
+  
   if (result[maxIdx] > TRESHOLD && maxIdx != 0) {
     let div = document.getElementById('topresult');
     div.innerHTML = '';
@@ -927,14 +956,14 @@ load_model_file_vad.addEventListener('change', async (e) => {
   let jsonFile;
   let binFile;
 
-  if(e.target.files[0].name.split('.').pop() == 'json' ) {
+  if (e.target.files[0].name.split('.').pop() == 'json') {
     jsonFile = e.target.files[0];
     binFile = e.target.files[1];
   } else {
     jsonFile = e.target.files[1];
     binFile = e.target.files[0];
   }
-  
+
   utils.assert(model_vad == undefined, 'vad model already defined?'); //overwrite????
   utils.assert(is_trained_vad == false, 'vad model already trained?');
   console.log('loading vad model from', jsonFile.name, binFile.name);

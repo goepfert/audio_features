@@ -3,17 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/style.css" />
     <title>Microphone Demo</title>
   </head>
   <body>
     <h1>Microphone Demo</h1>
 
-    <canvas id="oscilloscope" height="0"></canvas><br />
-    <canvas id="fft-series" height="0"></canvas><br />
+    <canvas id="oscilloscope" height="0"></canvas>
+    <canvas id="fft-series" height="0"></canvas>
+    <h3>Mel Series</h3>
     <canvas id="fft-series mel" height="0"></canvas><br />
+    <h3>Predict Image</h3>
     <canvas id="fft-series pred" height="0"></canvas> <br>
+    <h3>Meter</h3>
+    <h4>Voice Activity Detection</h4>
     <canvas id="vad meter" height="0"></canvas>
+    <h4>Prediction</h4>
+    <div id="pred meter container"></div>
+    <!-- <canvas id="pred meter" height="0"></canvas> -->
 
     <br> <br>
     <h3>Voice Activity Detection</h3>
