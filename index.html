@@ -3,57 +3,74 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/skeleton.css" />
     <link rel="stylesheet" href="css/style.css" />
-    <title>Microphone Demo</title>
+    <title>audio features</title>
   </head>
   <body>
-    <h1>Microphone Demo</h1>
+    <div class="container">
+      <h1>Speech Recognition and Voice Activity Detection</h1>
 
-    <canvas id="oscilloscope" height="0"></canvas>
-    <canvas id="fft-series" height="0"></canvas>
-    <h3>Mel Series</h3>
-    <canvas id="fft-series mel" height="0"></canvas><br />
-    <h3>Predict Image</h3>
-    <canvas id="fft-series pred" height="0"></canvas> <br>
-    <h3>Meter</h3>
-    <h4>Voice Activity Detection</h4>
-    <canvas id="vad meter" height="0"></canvas>
-    <h4>Prediction</h4>
-    <div id="pred meter container"></div>
-    <!-- <canvas id="pred meter" height="0"></canvas> -->
+      <!-- <canvas id="oscilloscope" height="0"></canvas>
+      <canvas id="fft-series" height="0"></canvas> -->
 
-    <br> <br>
-    <h3>Voice Activity Detection</h3>
-    <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display:none;"/>
-    <label for="download-model-vad" class="custom-button">Load model</label>
-    <label for="download-model-vad">not selected</label>
-    <br>
-    <input type="file" value="" id="download-data-vad" accept=".txt" style="display:none;"/>
-    <label for="download-data-vad" class="custom-button">Load data</label>
-    <label for="download-data-vad">not selected</label>
-    <br> <br>
+      <!-- <h2>Mel Series</h2> -->
+      <h5>mel series</h5>
+      <canvas id="fft-series mel" height="0"></canvas>
 
-    <div id="record_btns_vad"></div>
-    <button class="train_btn_vad" id="train_btn_vad">Train VAD</button><br />
-    <button id="show-accuracy-vad">Show Accuracy</button>
-    <button id="show-confusion-vad">Show Confusion Matrix</button>
-    <br />
-    <br>
+      <h5>predict window</h5>
+      <canvas id="fft-series pred" height="0"></canvas>
 
-    <form>
-      <label for="vad_model">name:</label>
-      <input type="text" id="vad_model_name" value="vad_model" />
-    </form>
-    <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
-    <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
+      <h2>Meter</h2>
+      <h3>Voice Activity Detection</h3>
+      <canvas id="vad meter" height="0"></canvas>
 
-    <br />
-    <br />
+      <h3>Prediction</h3>
+      <div class="row" style="margin-bottom: 50px;">
+        <div class="twelve columns" id="pred meter container"></div>
+      </div>
+      <!-- <canvas id="pred meter" height="0"></canvas> -->
 
-    <h3>Speech Recognition</h3>
-    <div id="record_btns"></div>
-    <!-- TODO: create button dynamically -->
-    <!-- <button class="record_btn" id="class1">Record Class1</button>
+      <h2>Voice Activity Detection</h2>
+
+      <div style="float: left;">
+        <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none;" />
+        <label for="download-model-vad" class="button">Load model</label>
+        <label for="download-model-vad">not selected</label>
+      </div>
+
+      <div class="clearfix"></div>
+
+      <div style="float: left;">
+        <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none;" />
+        <label for="download-data-vad" class="button">Load data</label>
+        <label for="download-data-vad">not selected</label>
+      </div>
+
+      <br />
+      <br />
+
+      <div id="record_btns_vad"></div>
+      <button class="train_btn_vad" id="train_btn_vad">Train VAD</button><br />
+      <button id="show-accuracy-vad">Show Accuracy</button>
+      <button id="show-confusion-vad">Show Confusion Matrix</button>
+      <br />
+      <br />
+
+      <form>
+        <label for="vad_model">name:</label>
+        <input type="text" id="vad_model_name" value="vad_model" />
+      </form>
+      <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
+      <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
+
+      <br />
+      <br />
+
+      <h3>Speech Recognition</h3>
+      <div id="record_btns"></div>
+      <!-- TODO: create button dynamically -->
+      <!-- <button class="record_btn" id="class1">Record Class1</button>
     <label for="class1">0</label><br />
     <button class="record_btn" id="class2">Record Class2</button>
     <label for="class2">0</label><br />
@@ -61,14 +78,15 @@
     <label for="class3">0</label><br />
     <button class="record_btn" id="class4">Record Class4</button>
     <label for="class4">0</label><br /> -->
-    <button id="showImages_btn">Show Records</button><br />
-    <button class="train_btn" id="train_btn">Train</button><br />
-    <button class="predict_btn" id="predict_btn">Predict</button><br />
-    <button id="show-accuracy">Show Accuracy</button>
-    <button id="show-confusion">Show Confusion Matrix</button>
-    <div class="predict" id="predict">
-      <ul id="result"></ul>
-      <div id="topresult"></div>
+      <button id="showImages_btn">Show Records</button><br />
+      <button class="train_btn" id="train_btn">Train</button><br />
+      <button class="predict_btn" id="predict_btn">Predict</button><br />
+      <button id="show-accuracy">Show Accuracy</button>
+      <button id="show-confusion">Show Confusion Matrix</button>
+      <div class="predict" id="predict">
+        <ul id="result"></ul>
+        <div id="topresult"></div>
+      </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.js"></script>
