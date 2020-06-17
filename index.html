@@ -15,19 +15,21 @@
       <canvas id="fft-series" height="0"></canvas> -->
 
       <!-- <h2>Mel Series</h2> -->
-      <h5>mel series</h5>
+      <h5>Mel spectrum of microphone input</h5>
       <canvas id="fft-series mel" height="0"></canvas>
 
-      <h5>predict window</h5>
+      <h5>Prediction window</h5>
       <canvas id="fft-series pred" height="0"></canvas>
 
-      <h2>Meter</h2>
-      <h3>Voice Activity Detection</h3>
-      <canvas id="vad meter" height="0"></canvas>
+      <div class="meter">
+        <h2>Meter</h2>
+        <h3>Voice Activity Detection</h3>
+        <canvas id="vad meter" height="0"></canvas>
 
-      <h3>Prediction</h3>
-      <div class="row" style="margin-bottom: 50px;">
-        <div class="twelve columns" id="pred meter container"></div>
+        <h3>Prediction</h3>
+        <div class="row">
+          <div class="twelve columns" id="pred meter container"></div>
+        </div>
       </div>
       <!-- <canvas id="pred meter" height="0"></canvas> -->
 
@@ -36,7 +38,7 @@
       <div style="float: left;">
         <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none;" />
         <label for="download-model-vad" class="button">Load model</label>
-        <label for="download-model-vad">not selected</label>
+        <label for="download-model-vad" style="display: inline;">not selected</label>
       </div>
 
       <div class="clearfix"></div>
@@ -44,28 +46,29 @@
       <div style="float: left;">
         <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none;" />
         <label for="download-data-vad" class="button">Load data</label>
-        <label for="download-data-vad">not selected</label>
+        <label for="download-data-vad" style="display: inline;">not selected</label>
       </div>
 
-      <br />
-      <br />
+      <div class="clearfix"></div>
 
       <div id="record_btns_vad"></div>
-      <button class="train_btn_vad" id="train_btn_vad">Train VAD</button><br />
+
+      <div class="clearfix"></div>
+
+      <button class="train_btn_vad" id="train_btn_vad">Train VAD</button>
       <button id="show-accuracy-vad">Show Accuracy</button>
       <button id="show-confusion-vad">Show Confusion Matrix</button>
-      <br />
-      <br />
+
+      <div class="clearfix"></div>
 
       <form>
-        <label for="vad_model">name:</label>
+        <label for="vad_model_vad" style="display: inline;">File name prefix:</label>
         <input type="text" id="vad_model_name" value="vad_model" />
       </form>
       <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
       <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
 
-      <br />
-      <br />
+      <div class="clearfix"></div>
 
       <h3>Speech Recognition</h3>
       <div id="record_btns"></div>

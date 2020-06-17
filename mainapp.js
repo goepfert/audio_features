@@ -45,7 +45,7 @@ const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
-const VAD_THRESHOLD = -1; //0.7;
+const VAD_THRESHOLD = 0.7;
 const TRESHOLD = 0.9;
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
@@ -155,7 +155,6 @@ let context_pred_meter = [];
     context_fftSeries_pred = canvas_fftSeries_pred.getContext('2d');
     canvas_fftSeries_pred.width = 4 * RB_SIZE_FRAMING;
     canvas_fftSeries_pred.height = 4 * N_MEL_FILTER;
-
   }
 
   if (drawit[4]) {
@@ -167,7 +166,6 @@ let context_pred_meter = [];
     //create pred canvas dynamically
     const container = document.getElementById('pred meter container');
     for (let classIdx = 0; classIdx < NCLASSES; classIdx++) {
-
       let canvas = document.createElement('canvas');
       canvas.width = 4 * RB_SIZE_FRAMING;
       canvas.height = 40;
@@ -178,7 +176,7 @@ let context_pred_meter = [];
       let context = canvas.getContext('2d');
       container.appendChild(label);
       container.appendChild(canvas);
-      container.appendChild(document.createElement('br'))
+      container.appendChild(document.createElement('br'));
       canvas_pred_meter.push(canvas);
       context_pred_meter.push(context);
     }
@@ -352,7 +350,7 @@ function doVAD() {
   //console.log(VAD_AVERAGE);
 }
 
-/** 
+/**
  * average VAD over the record size
  */
 function averageVAD(endPos) {
@@ -541,9 +539,9 @@ const draw = function () {
     const rectWidth = canvas_vad_meter.width;
     context_vad_meter.clearRect(0, 0, rectWidth, rectHeight);
     if (VAD_AVERAGE > VAD_THRESHOLD) {
-      context_vad_meter.fillStyle = "red";
+      context_vad_meter.fillStyle = 'red';
     } else {
-      context_vad_meter.fillStyle = "green";
+      context_vad_meter.fillStyle = 'green';
     }
     context_vad_meter.fillRect(0, 0, VAD_AVERAGE * rectWidth, rectHeight);
   }
@@ -561,10 +559,12 @@ const record_btns_div = document.getElementById('record_btns');
 for (let idx = 0; idx < NCLASSES; idx++) {
   const btn = document.createElement('button');
   btn.classList.add('record_btn');
+  btn.classList.add('button');
   btn.id = `class${idx + 1}`;
   btn.innerHTML = `Record class${idx + 1}`;
   const label = document.createElement('label');
   label.htmlFor = `class${idx + 1}`;
+  label.classList.add('inline');
   record_btns_div.appendChild(btn);
   record_btns_div.appendChild(label);
 }
@@ -579,6 +579,7 @@ for (let idx = 0; idx < N_VAD_CLASSES; idx++) {
   btn.innerHTML = `Record VAD class${idx + 1}`;
   const label = document.createElement('label');
   label.htmlFor = `vad class${idx + 1}`;
+  label.classList.add('inline');
   record_btns_vad_div.appendChild(btn);
   record_btns_vad_div.appendChild(label);
 }
@@ -750,7 +751,6 @@ train_btn.addEventListener('click', async () => {
  * Create Network for VAD and attach training to training button
  */
 train_btn_vad.addEventListener('click', async () => {
-
   if (model_vad == undefined) {
     model_vad = nn_vad.getModel();
   } else {
@@ -839,7 +839,7 @@ function showPrediction(result) {
 
   const maxIdx = utils.indexOfMax(result);
   console.log('top result', maxIdx, result[maxIdx]);
-  
+
   let list = document.getElementById('result');
   list.innerHTML = '';
 
@@ -857,17 +857,17 @@ function showPrediction(result) {
     const rectHeight = canvas_pred_meter[idx].height;
     const rectWidth = canvas_pred_meter[idx].width;
     context_pred_meter[idx].clearRect(0, 0, rectWidth, rectHeight);
-    
+
     if (result[idx] > VAD_THRESHOLD) {
-      context_pred_meter[idx].fillStyle = "red";
+      context_pred_meter[idx].fillStyle = 'red';
     } else {
-      context_pred_meter[idx].fillStyle = "green";
+      context_pred_meter[idx].fillStyle = 'green';
     }
     context_pred_meter[idx].fillRect(0, 0, result[idx] * rectWidth, rectHeight);
   }
 
   //
-  
+
   if (result[maxIdx] > TRESHOLD && maxIdx != 0) {
     let div = document.getElementById('topresult');
     div.innerHTML = '';
@@ -930,7 +930,6 @@ showImages_btn.addEventListener('click', async () => {
   }
 });
 
-
 /**
  * save VAD model to file
  */
@@ -942,15 +941,13 @@ save_model_btn_vad.addEventListener('click', async () => {
   console.log(await model_vad.save(`downloads://${filename}`));
 });
 
-
 /**
  * load VAD model
  * user has to select json and bin file
  */
 const load_model_file_vad = document.getElementById('download-model-vad');
 load_model_file_vad.addEventListener('change', async (e) => {
-
-  utils.assert(e.target.files.length == 2, "select one json and one bin file for model");
+  utils.assert(e.target.files.length == 2, 'select one json and one bin file for model');
   e.target.labels[1].innerHTML = '';
 
   let jsonFile;
@@ -974,8 +971,7 @@ load_model_file_vad.addEventListener('change', async (e) => {
   console.log(model_vad);
 });
 
-
-/** 
+/**
  * save recorded vad images
  * can be loaded and extended for further training
  */
@@ -999,7 +995,7 @@ load_data_file_vad.addEventListener('change', (e) => {
   const reader = new FileReader();
   reader.addEventListener('load', (event) => {
     let res = event.target.result;
-    let textByLine = res.split("\n");
+    let textByLine = res.split('\n');
     let newInputs = JSON.parse(textByLine);
     dataset_vad.clearInputs();
     dataset_vad.setInputs(newInputs);

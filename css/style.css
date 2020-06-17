@@ -1,10 +1,20 @@
-@import url('https://fonts.googleapis.com/css?family=Lato&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora&display=swap');
 body {
-  font-family: 'Lato';
+  font-family: 'Lora', serif;
 }
 
 .clearfix:after {
   content: '';
   display: table;
   clear: both;
+}
+
+.inline {
+  display: inline;
+  margin-left: 0.3rem;
+  margin-right: 0.3rem;
+}
+
+.meter {
+  /* display: none; */
 }
