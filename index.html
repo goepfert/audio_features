@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="css/skeleton.css" />
+    <!-- <link rel="stylesheet" href="css/skeleton.css" /> -->
     <link rel="stylesheet" href="css/style.css" />
     <title>audio features</title>
   </head>
@@ -15,77 +15,64 @@
       <canvas id="fft-series" height="0"></canvas> -->
 
       <!-- <h2>Mel Series</h2> -->
-      <h5>Mel spectrum of microphone input</h5>
+      <h3>Mel spectrum of microphone input</h3>
       <canvas id="fft-series mel" height="0"></canvas>
 
-      <h5>Prediction window</h5>
+      <h3>Prediction window</h3>
       <canvas id="fft-series pred" height="0"></canvas>
 
       <div class="meter">
         <h2>Meter</h2>
-        <h3>Voice Activity Detection</h3>
-        <canvas id="vad meter" height="0"></canvas>
+        <div class="meter_vad">
+          <h3>Voice Activity Detection</h3>
+          <canvas id="vad meter" height="0"></canvas>
+        </div>
 
-        <h3>Prediction</h3>
-        <div class="row">
-          <div class="twelve columns" id="pred meter container"></div>
+        <div class="meter_pred">
+          <h3>Prediction</h3>
+          <div id="pred meter container"></div>
         </div>
       </div>
       <!-- <canvas id="pred meter" height="0"></canvas> -->
 
       <h2>Voice Activity Detection</h2>
 
-      <div style="float: left;">
+      <div class="row">
         <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none;" />
         <label for="download-model-vad" class="button">Load model</label>
-        <label for="download-model-vad" style="display: inline;">not selected</label>
+        <label for="download-model-vad">not selected</label>
       </div>
 
-      <div class="clearfix"></div>
-
-      <div style="float: left;">
+      <div class="row">
         <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none;" />
         <label for="download-data-vad" class="button">Load data</label>
-        <label for="download-data-vad" style="display: inline;">not selected</label>
+        <label for="download-data-vad">not selected</label>
       </div>
 
-      <div class="clearfix"></div>
+      <div class="row" id="record_btns_vad"></div>
 
-      <div id="record_btns_vad"></div>
+      <div class="row">
+        <button class="train_btn_vad" id="train_btn_vad">Train VAD</button>
+        <button id="show-accuracy-vad">Show Accuracy</button>
+        <button id="show-confusion-vad">Show Confusion Matrix</button>
+      </div>
 
-      <div class="clearfix"></div>
+      <div class="row">
+        <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
+        <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
+      </div>
 
-      <button class="train_btn_vad" id="train_btn_vad">Train VAD</button>
-      <button id="show-accuracy-vad">Show Accuracy</button>
-      <button id="show-confusion-vad">Show Confusion Matrix</button>
+      <h2>Speech Recognition</h2>
+      <div class="row" id="record_btns"></div>
 
-      <div class="clearfix"></div>
+      <button id="showImages_btn">Show Records</button>
+      <div class="row">
+        <button class="train_btn" id="train_btn">Train</button>
+        <button id="show-accuracy">Show Accuracy</button>
+        <button id="show-confusion">Show Confusion Matrix</button>
+      </div>
+      <button class="predict_btn" id="predict_btn">Predict</button>
 
-      <form>
-        <label for="vad_model_vad" style="display: inline;">File name prefix:</label>
-        <input type="text" id="vad_model_name" value="vad_model" />
-      </form>
-      <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
-      <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
-
-      <div class="clearfix"></div>
-
-      <h3>Speech Recognition</h3>
-      <div id="record_btns"></div>
-      <!-- TODO: create button dynamically -->
-      <!-- <button class="record_btn" id="class1">Record Class1</button>
-    <label for="class1">0</label><br />
-    <button class="record_btn" id="class2">Record Class2</button>
-    <label for="class2">0</label><br />
-    <button class="record_btn" id="class3">Record Class3</button>
-    <label for="class3">0</label><br />
-    <button class="record_btn" id="class4">Record Class4</button>
-    <label for="class4">0</label><br /> -->
-      <button id="showImages_btn">Show Records</button><br />
-      <button class="train_btn" id="train_btn">Train</button><br />
-      <button class="predict_btn" id="predict_btn">Predict</button><br />
-      <button id="show-accuracy">Show Accuracy</button>
-      <button id="show-confusion">Show Confusion Matrix</button>
       <div class="predict" id="predict">
         <ul id="result"></ul>
         <div id="topresult"></div>

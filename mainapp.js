@@ -166,6 +166,9 @@ let context_pred_meter = [];
     //create pred canvas dynamically
     const container = document.getElementById('pred meter container');
     for (let classIdx = 0; classIdx < NCLASSES; classIdx++) {
+      const subcontainer = document.createElement('div');
+      subcontainer.classList.add('row');
+
       let canvas = document.createElement('canvas');
       canvas.width = 4 * RB_SIZE_FRAMING;
       canvas.height = 40;
@@ -174,9 +177,12 @@ let context_pred_meter = [];
       label.innerHTML = `class${classIdx + 1}`;
       label.htmlFor = `pred class${classIdx + 1}`;
       let context = canvas.getContext('2d');
-      container.appendChild(label);
-      container.appendChild(canvas);
-      container.appendChild(document.createElement('br'));
+
+      subcontainer.appendChild(label);
+      subcontainer.appendChild(canvas);
+
+      container.appendChild(subcontainer);
+      //container.appendChild(document.createElement('br'));
       canvas_pred_meter.push(canvas);
       context_pred_meter.push(context);
     }
@@ -937,7 +943,7 @@ const save_model_btn_vad = document.getElementById('save_model_btn_vad');
 save_model_btn_vad.addEventListener('click', async () => {
   utils.assert(model_vad != undefined, 'vad model undefined');
   utils.assert(is_trained_vad == true, 'not trained yet?');
-  const filename = document.getElementById('vad_model_name').value;
+  const filename = 'vad_model_name';
   console.log(await model_vad.save(`downloads://${filename}`));
 });
 
@@ -977,7 +983,7 @@ load_model_file_vad.addEventListener('change', async (e) => {
  */
 const save_data_btn_vad = document.getElementById('save_data_btn_vad');
 save_data_btn_vad.addEventListener('click', async () => {
-  const filename = document.getElementById('vad_model_name').value;
+  const filename = 'vad_model_name';
   const inputs = dataset_vad.getInputs();
   console.log('saving vad data:', inputs.length);
   utils.download(JSON.stringify(inputs), `${filename}`, 'text/plain');
