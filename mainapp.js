@@ -46,7 +46,7 @@ const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) /
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD
 const VAD_THRESHOLD = 0.7;
-const TRESHOLD = 0.9;
+const THRESHOLD = 0.9;
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
 let VAD_LAST_POS = 0;
@@ -128,6 +128,7 @@ let canvas_vad_meter;
 let context_vad_meter;
 let canvas_pred_meter = [];
 let context_pred_meter = [];
+let label_pred = [];
 (function create_some_stuff() {
   if (drawit[0]) {
     canvas = document.getElementById('oscilloscope');
@@ -176,6 +177,9 @@ let context_pred_meter = [];
       const label = document.createElement('label');
       label.innerHTML = `class${classIdx + 1}`;
       label.htmlFor = `pred class${classIdx + 1}`;
+
+      label_pred.push(label);
+
       let context = canvas.getContext('2d');
 
       subcontainer.appendChild(label);
@@ -277,9 +281,11 @@ function doVAD() {
     availableData = Data_Pos + RB_SIZE_FRAMING - vad_nextStartPos;
   }
 
-  if (availableData < VAD_SIZE) {
+  if (availableData < VAD_SIZE || model_vad == undefined) {
     return;
   }
+
+  showMeter_VAD();
 
   let curpos = vad_nextStartPos;
   let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
@@ -309,39 +315,37 @@ function doVAD() {
   // do some averaging when overlapping (does not look very efficient though)
   // and ... do it sychronously !!! otherwise the variables may get alterd after this fcn
   curpos = vad_nextStartPos;
-  if (model_vad != undefined) {
-    tf.tidy(() => {
-      //get voice activity in current frame
-      let x = tf.tensor2d(VAD_IMG).reshape([1, VAD_SIZE, N_MEL_FILTER, 1]);
+  tf.tidy(() => {
+    //get voice activity in current frame
+    let x = tf.tensor2d(VAD_IMG).reshape([1, VAD_SIZE, N_MEL_FILTER, 1]);
 
-      const res = model_vad.predict(x);
-      const result = res.dataSync();
+    const res = model_vad.predict(x);
+    const result = res.dataSync();
 
-      // console.log('b', vad_nextStartPos, endPos, vad_prevEndPos);
+    // console.log('b', vad_nextStartPos, endPos, vad_prevEndPos);
 
-      let hit = false;
-      for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-        if (curpos == vad_prevEndPos) {
-          hit = true;
-        }
-        if (!hit) {
-          VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
-        } else {
-          VAD_RESULT[curpos] = result[1];
-        }
-
-        curpos++;
-        if (curpos >= RB_SIZE_FRAMING) {
-          curpos = 0;
-        }
-        if (curpos == endPos) {
-          break;
-        }
-        // do it in here :)
-        vad_prevEndPos = endPos;
+    let hit = false;
+    for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
+      if (curpos == vad_prevEndPos) {
+        hit = true;
       }
-    });
-  }
+      if (!hit) {
+        VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
+      } else {
+        VAD_RESULT[curpos] = result[1];
+      }
+
+      curpos++;
+      if (curpos >= RB_SIZE_FRAMING) {
+        curpos = 0;
+      }
+      if (curpos == endPos) {
+        break;
+      }
+      // do it in here :)
+      vad_prevEndPos = endPos;
+    }
+  });
 
   // last
   VAD_LAST_POS = vad_nextStartPos + VAD_SIZE;
@@ -382,6 +386,22 @@ function averageVAD(endPos) {
     }
   }
   VAD_AVERAGE /= size;
+}
+
+function showMeter_VAD() {
+  let meter_div = document.getElementById('meter');
+  meter_div.style.display = 'block';
+
+  let meter_vad_div = document.getElementById('meter_vad');
+  meter_vad_div.style.display = 'block';
+}
+
+function showMeter_pred() {
+  let meter_div = document.getElementById('meter');
+  meter_div.style.display = 'block';
+
+  let meter_pred_div = document.getElementById('meter_pred');
+  meter_pred_div.style.display = 'block';
 }
 
 /**
@@ -570,7 +590,6 @@ for (let idx = 0; idx < NCLASSES; idx++) {
   btn.innerHTML = `Record class${idx + 1}`;
   const label = document.createElement('label');
   label.htmlFor = `class${idx + 1}`;
-  label.classList.add('inline');
   record_btns_div.appendChild(btn);
   record_btns_div.appendChild(label);
 }
@@ -782,13 +801,16 @@ train_btn_vad.addEventListener('click', async () => {
 function predict(endFrame) {
   //console.log(utils.getTime());
 
+  showMeter_pred();
+
   let startFrame = endFrame - RECORD_SIZE_FRAMING;
   if (startFrame < 0) {
     startFrame = RB_SIZE_FRAMING + startFrame;
   }
 
   console.log(utils.getTime(), 'voice activity detected:', VAD_AVERAGE);
-  if (VAD_AVERAGE > VAD_THRESHOLD) {
+
+  if (VAD_AVERAGE > VAD_THRESHOLD || model_vad == undefined) {
     suspend = PRED_SUSPEND;
 
     let image = [];
@@ -846,46 +868,23 @@ function showPrediction(result) {
   const maxIdx = utils.indexOfMax(result);
   console.log('top result', maxIdx, result[maxIdx]);
 
-  let list = document.getElementById('result');
-  list.innerHTML = '';
-
   for (let idx = 0; idx < result.length; idx++) {
-    let entry = document.createElement('li');
-    let span = document.createElement('span');
-    let textNode = document.createTextNode(`${inputs[idx].label}: ${result[idx].toFixed(2)}`);
     if (idx == maxIdx) {
-      span.style.color = 'red';
+      label_pred[idx].style.color = 'red';
+    } else {
+      label_pred[idx].style.color = null;
     }
-    span.appendChild(textNode);
-    entry.appendChild(span);
-    list.appendChild(entry);
 
     const rectHeight = canvas_pred_meter[idx].height;
     const rectWidth = canvas_pred_meter[idx].width;
     context_pred_meter[idx].clearRect(0, 0, rectWidth, rectHeight);
 
-    if (result[idx] > VAD_THRESHOLD) {
+    if (result[idx] > THRESHOLD) {
       context_pred_meter[idx].fillStyle = 'red';
     } else {
       context_pred_meter[idx].fillStyle = 'green';
     }
     context_pred_meter[idx].fillRect(0, 0, result[idx] * rectWidth, rectHeight);
-  }
-
-  //
-
-  if (result[maxIdx] > TRESHOLD && maxIdx != 0) {
-    let div = document.getElementById('topresult');
-    div.innerHTML = '';
-    let entry = document.createElement('p');
-    let span = document.createElement('span');
-    let textNode;
-    textNode = document.createTextNode(
-      `last recognized class (threshold>${TRESHOLD}) except class1: ${inputs[maxIdx].label}`
-    );
-    span.appendChild(textNode);
-    entry.appendChild(span);
-    div.appendChild(entry);
   }
 }
 
@@ -1117,3 +1116,29 @@ document.querySelector('#show-accuracy').addEventListener('click', () => showAcc
 document.querySelector('#show-confusion').addEventListener('click', () => showConfusion());
 document.querySelector('#show-accuracy-vad').addEventListener('click', () => showAccuracy_vad());
 document.querySelector('#show-confusion-vad').addEventListener('click', () => showConfusion_vad());
+
+let section = document.getElementById('speech-section');
+let height = section.offsetHeight;
+section.style.height = height + 'px';
+document.getElementById('speech-section-header').onclick = function () {
+  if (section.style.visibility == 'hidden') {
+    section.style.visibility = 'visible';
+    section.style.height = height + 'px';
+  } else {
+    section.style.visibility = 'hidden';
+    section.style.height = '0';
+  }
+};
+
+let section_vad = document.getElementById('vad-section');
+let height_vad = section_vad.offsetHeight;
+section_vad.style.height = height_vad + 'px';
+document.getElementById('vad-section-header').onclick = function () {
+  if (section_vad.style.visibility == 'hidden') {
+    section_vad.style.visibility = 'visible';
+    section_vad.style.height = height_vad + 'px';
+  } else {
+    section_vad.style.visibility = 'hidden';
+    section_vad.style.height = '0';
+  }
+};

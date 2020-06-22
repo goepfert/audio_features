@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Lora&display=swap');
 :root {
   --button-color: rgb(241, 223, 223);
-  --hover-color: rgba(236, 218, 218, 0.24);
+  --hover-color: rgb(190, 189, 189);
 }
 
 * {
@@ -17,12 +17,6 @@ body {
   min-height: 100vh;
   margin: 0;
   font-family: 'Lora', serif;
-}
-
-.clearfix:after {
-  content: '';
-  display: table;
-  clear: both;
 }
 
 .container {
@@ -58,18 +52,12 @@ button, .button {
   font-family: 'Lora', serif;
 }
 
-button:hover {
-  background-color: var(--hover-color);
+label {
+  margin-right: 10px;
 }
 
-.button:hover {
+button:hover, .button:hover {
   background-color: var(--hover-color);
-}
-
-h2 {
-  border-bottom: 1px solid #bbb;
-  padding-bottom: 10px;
-  margin: 30px 0 10px;
 }
 
 .meter {
@@ -82,4 +70,21 @@ h2 {
 
 .meter_pred {
   display: none;
+}
+
+.clickable-heading {
+  justify-content: space-between;
+  cursor: pointer;
+  border-bottom: 1px solid #bbb;
+  margin: 30px 0 10px;
+}
+
+.speech-section, .vad-section {
+  transition: height 0.5s, visibility 0.2s, opacity 0.5s ease-in-out;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  /* font-weight: 800; */
 }

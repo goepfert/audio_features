@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- <link rel="stylesheet" href="css/skeleton.css" /> -->
     <link rel="stylesheet" href="css/style.css" />
+    <script src="https://kit.fontawesome.com/e003a6f9a1.js" crossorigin="anonymous"></script>
     <title>audio features</title>
   </head>
   <body>
@@ -21,61 +22,85 @@
       <h3>Prediction window</h3>
       <canvas id="fft-series pred" height="0"></canvas>
 
-      <div class="meter">
+      <div class="meter" id="meter">
         <h2>Meter</h2>
-        <div class="meter_vad">
+        <div class="meter_vad" id="meter_vad">
           <h3>Voice Activity Detection</h3>
           <canvas id="vad meter" height="0"></canvas>
         </div>
 
-        <div class="meter_pred">
+        <div class="meter_pred" id="meter_pred">
           <h3>Prediction</h3>
           <div id="pred meter container"></div>
         </div>
       </div>
       <!-- <canvas id="pred meter" height="0"></canvas> -->
 
-      <h2>Voice Activity Detection</h2>
-
-      <div class="row">
-        <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none;" />
-        <label for="download-model-vad" class="button">Load model</label>
-        <label for="download-model-vad">not selected</label>
+      <div class="row clickable-heading" id="speech-section-header">
+        <h2>Speech Recognition</h2>
+        <i class="fas fa-arrows-alt-v"></i>
       </div>
 
-      <div class="row">
-        <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none;" />
-        <label for="download-data-vad" class="button">Load data</label>
-        <label for="download-data-vad">not selected</label>
+      <div class="speech-section" id="speech-section">
+        <div class="row">
+          <input type="file" value="" id="download-model-pred" accept=".json,.bin" multiple style="display: none;" />
+          <label for="download-model-pred" class="button">Load model</label>
+          <label for="download-model-pred">not selected</label>
+        </div>
+
+        <div class="row">
+          <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none;" />
+          <label for="download-data-vad" class="button">Load data</label>
+          <label for="download-data-vad">not selected</label>
+        </div>
+
+        <div class="row" id="record_btns"></div>
+
+        <button id="showImages_btn">Show Records</button>
+        <div class="row">
+          <button class="train_btn" id="train_btn">Train</button>
+          <button id="show-accuracy">Show Accuracy</button>
+          <button id="show-confusion">Show Confusion Matrix</button>
+        </div>
+
+        <div class="row">
+          <button class="save_model_btn_pred" id="save_model_btn_pred">Save model</button>
+          <button class="save_data_btn_pred" id="save_data_btn_pred">Save data</button>
+        </div>
+
+        <button class="predict_btn" id="predict_btn">Predict</button>
       </div>
 
-      <div class="row" id="record_btns_vad"></div>
-
-      <div class="row">
-        <button class="train_btn_vad" id="train_btn_vad">Train VAD</button>
-        <button id="show-accuracy-vad">Show Accuracy</button>
-        <button id="show-confusion-vad">Show Confusion Matrix</button>
+      <div class="row clickable-heading" id="vad-section-header">
+        <h2>Voice Activity Detection</h2>
+        <i class="fas fa-arrows-alt-v"></i>
       </div>
 
-      <div class="row">
-        <button class="save_model_btn_vad" id="save_model_btn_vad">Save Model VAD</button>
-        <button class="save_data_btn_vad" id="save_data_btn_vad">Save Data VAD</button>
-      </div>
+      <div class="vad-section" id="vad-section">
+        <div class="row">
+          <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none;" />
+          <label for="download-model-vad" class="button">Load model</label>
+          <label for="download-model-vad">not selected</label>
+        </div>
 
-      <h2>Speech Recognition</h2>
-      <div class="row" id="record_btns"></div>
+        <div class="row">
+          <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none;" />
+          <label for="download-data-vad" class="button">Load data</label>
+          <label for="download-data-vad">not selected</label>
+        </div>
 
-      <button id="showImages_btn">Show Records</button>
-      <div class="row">
-        <button class="train_btn" id="train_btn">Train</button>
-        <button id="show-accuracy">Show Accuracy</button>
-        <button id="show-confusion">Show Confusion Matrix</button>
-      </div>
-      <button class="predict_btn" id="predict_btn">Predict</button>
+        <div class="row" id="record_btns_vad"></div>
 
-      <div class="predict" id="predict">
-        <ul id="result"></ul>
-        <div id="topresult"></div>
+        <div class="row">
+          <button class="train_btn_vad" id="train_btn_vad">Train VAD</button>
+          <button id="show-accuracy-vad">Show Accuracy</button>
+          <button id="show-confusion-vad">Show Confusion Matrix</button>
+        </div>
+
+        <div class="row">
+          <button class="save_model_btn_vad" id="save_model_btn_vad">Save model</button>
+          <button class="save_data_btn_vad" id="save_data_btn_vad">Save data</button>
+        </div>
       </div>
     </div>
 
