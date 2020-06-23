@@ -54,8 +54,8 @@ let VAD_AVERAGE = 0;
 
 // Datasets
 const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
-const dataset = createDataset(NCLASSES, undefined, undefined, 0.2); // validation split
-const dataset_vad = createDataset(2, VAD_SIZE, N_MEL_FILTER, 0.2); // validation split
+const dataset = createDataset(NCLASSES, undefined, undefined, 0.2);
+const dataset_vad = createDataset(2, VAD_SIZE, N_MEL_FILTER, 0.2);
 let trained_data = undefined;
 let trained_data_vad = undefined;
 let is_trained = false;
@@ -68,17 +68,14 @@ const opt = { fill_mode: 'nearest' };
 const generator = createImageDataGenerator(opt);
 
 // Neural Network
-let nn; // defined later
+let nn = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, NCLASSES);
 let model;
 const nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2);
 let model_vad;
-const MEAN_NORMALIZE = true; // false -> standardize
+const MEAN_NORMALIZE = false; // false -> standardize
 const PRED_IMG = [];
-// no vad -> about 500 ms
-// with vad -> VAD_TIME ?
-//console.log(VAD_TIME);
 const PRED_INTERVALL = 250;
-const PRED_SUSPEND = 4;
+const PRED_SUSPEND = 4; // suspend prediction x times intervall
 let suspend = 1;
 
 //console.log(samplerate, BUFFER_SIZE, FRAME_SIZE, FRAME_STRIDE, RB_SIZE, RB_SIZE_FRAMING, N_DCT, RECORD_SIZE);
@@ -757,8 +754,15 @@ function toggleButtons(flag) {
  */
 train_btn.addEventListener('click', async () => {
   toggleButtons(true);
-  nn = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, NCLASSES);
-  model = nn.getModel();
+
+  if (model == undefined) {
+    model = nn.getModel();
+  } else {
+    //nn_vad.freezeModelforTransferLearning(model_vad);
+    console.log('continue training with new dataset');
+    nn.compile_model(model);
+  }
+
   tfvis.show.modelSummary({ name: 'Model Summary' }, model);
   trained_data = dataset.getData();
   await nn.train(trained_data.x, trained_data.y, model);
@@ -947,6 +951,17 @@ save_model_btn_vad.addEventListener('click', async () => {
 });
 
 /**
+ * save Speech Rec model to file
+ */
+const save_model_btn = document.getElementById('save_model_btn_pred');
+save_model_btn.addEventListener('click', async () => {
+  utils.assert(model != undefined, 'speech model undefined');
+  utils.assert(is_trained == true, 'not trained yet?');
+  const filename = 'speech_model_name';
+  console.log(await model.save(`downloads://${filename}`));
+});
+
+/**
  * load VAD model
  * user has to select json and bin file
  */
@@ -977,14 +992,56 @@ load_model_file_vad.addEventListener('change', async (e) => {
 });
 
 /**
+ * load Speech model
+ * user has to select json and bin file
+ */
+const load_model_file = document.getElementById('download-model-pred');
+load_model_file.addEventListener('change', async (e) => {
+  utils.assert(e.target.files.length == 2, 'select one json and one bin file for model');
+  e.target.labels[1].innerHTML = '';
+
+  let jsonFile;
+  let binFile;
+
+  if (e.target.files[0].name.split('.').pop() == 'json') {
+    jsonFile = e.target.files[0];
+    binFile = e.target.files[1];
+  } else {
+    jsonFile = e.target.files[1];
+    binFile = e.target.files[0];
+  }
+
+  utils.assert(model_vad == undefined, 'speech model already defined?'); //overwrite????
+  utils.assert(is_trained_vad == false, 'speech model already trained?');
+  console.log('loading speech model from', jsonFile.name, binFile.name);
+
+  e.target.labels[1].innerHTML = jsonFile.name + ', ' + binFile.name;
+
+  model = await tf.loadLayersModel(tf.io.browserFiles([jsonFile, binFile]));
+  console.log(model);
+});
+
+/**
  * save recorded vad images
  * can be loaded and extended for further training
  */
 const save_data_btn_vad = document.getElementById('save_data_btn_vad');
 save_data_btn_vad.addEventListener('click', async () => {
-  const filename = 'vad_model_name';
+  const filename = 'vad_model';
   const inputs = dataset_vad.getInputs();
   console.log('saving vad data:', inputs.length);
+  utils.download(JSON.stringify(inputs), `${filename}`, 'text/plain');
+});
+
+/**
+ * save recorded speech images
+ * can be loaded and extended for further training
+ */
+const save_data_btn = document.getElementById('save_data_btn_pred');
+save_data_btn.addEventListener('click', async () => {
+  const filename = 'speech_model';
+  const inputs = dataset.getInputs();
+  console.log('saving speech data:', inputs.length);
   utils.download(JSON.stringify(inputs), `${filename}`, 'text/plain');
 });
 
@@ -1004,6 +1061,28 @@ load_data_file_vad.addEventListener('change', (e) => {
     let newInputs = JSON.parse(textByLine);
     dataset_vad.clearInputs();
     dataset_vad.setInputs(newInputs);
+    e.target.labels[1].innerHTML = file.name;
+  });
+  //reader.readAsDataURL(file);
+  reader.readAsText(file);
+});
+
+/**
+ * Load previously recorded Speech images
+ * clear all currently recorded images !
+ * has to be the same number of classes and dimension
+ */
+const load_data_file = document.getElementById('download-data-pred');
+load_data_file.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  console.log('loading speech date from', file.name);
+  const reader = new FileReader();
+  reader.addEventListener('load', (event) => {
+    let res = event.target.result;
+    let textByLine = res.split('\n');
+    let newInputs = JSON.parse(textByLine);
+    dataset.clearInputs();
+    dataset.setInputs(newInputs);
     e.target.labels[1].innerHTML = file.name;
   });
   //reader.readAsDataURL(file);
@@ -1118,27 +1197,37 @@ document.querySelector('#show-accuracy-vad').addEventListener('click', () => sho
 document.querySelector('#show-confusion-vad').addEventListener('click', () => showConfusion_vad());
 
 let section = document.getElementById('speech-section');
+let icon = document.getElementById('icon-speech-rec');
 let height = section.offsetHeight;
 section.style.height = height + 'px';
 document.getElementById('speech-section-header').onclick = function () {
   if (section.style.visibility == 'hidden') {
     section.style.visibility = 'visible';
     section.style.height = height + 'px';
+    icon.classList.remove('fa-angle-double-down');
+    icon.classList.add('fa-angle-double-up');
   } else {
     section.style.visibility = 'hidden';
     section.style.height = '0';
+    icon.classList.remove('fa-angle-double-up');
+    icon.classList.add('fa-angle-double-down');
   }
 };
 
 let section_vad = document.getElementById('vad-section');
 let height_vad = section_vad.offsetHeight;
+let icon_vad = document.getElementById('icon-vad');
 section_vad.style.height = height_vad + 'px';
 document.getElementById('vad-section-header').onclick = function () {
   if (section_vad.style.visibility == 'hidden') {
     section_vad.style.visibility = 'visible';
     section_vad.style.height = height_vad + 'px';
+    icon_vad.classList.remove('fa-angle-double-down');
+    icon_vad.classList.add('fa-angle-double-up');
   } else {
     section_vad.style.visibility = 'hidden';
     section_vad.style.height = '0';
+    icon_vad.classList.remove('fa-angle-double-up');
+    icon_vad.classList.add('fa-angle-double-down');
   }
 };

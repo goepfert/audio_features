@@ -75,14 +75,18 @@ function createNetwork(width, height, nClasses) {
       })
     );
 
+    compile_model(model);
+
+    return model;
+  }
+
+  function compile_model(model) {
     const optimizer = tf.train.adam();
     model.compile({
       optimizer: optimizer,
       loss: 'categoricalCrossentropy',
       metrics: ['accuracy'],
     });
-
-    return model;
   }
 
   async function train(xs, ys, model) {
@@ -109,5 +113,6 @@ function createNetwork(width, height, nClasses) {
   return {
     getModel: getModel,
     train: train,
+    compile_model: compile_model,
   };
 }

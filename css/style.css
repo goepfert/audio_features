@@ -39,7 +39,8 @@ canvas {
   padding: 2px;
 }
 
-button, .button {
+button,
+.button {
   cursor: pointer;
   background-color: #dcddf7;
   color: rgb(48, 48, 48);
@@ -56,7 +57,8 @@ label {
   margin-right: 10px;
 }
 
-button:hover, .button:hover {
+button:hover,
+.button:hover {
   background-color: var(--hover-color);
 }
 
@@ -79,12 +81,18 @@ button:hover, .button:hover {
   margin: 30px 0 10px;
 }
 
-.speech-section, .vad-section {
-  transition: height 0.5s, visibility 0.2s, opacity 0.5s ease-in-out;
+.speech-section,
+.vad-section {
+  transition: height 0.5s, visibility 0.2s, opacity 0.2s ease-in-out;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  margin-top: 2rem;
-  margin-bottom: 1rem;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-top: 20px;
+  margin-bottom: 10px;
   /* font-weight: 800; */
 }
