@@ -15,13 +15,14 @@
       <!-- <canvas id="oscilloscope" height="0"></canvas>
       <canvas id="fft-series" height="0"></canvas> -->
 
-      <!-- <h2>Mel Series</h2> -->
-      <h3>Mel spectrum of microphone input</h3>
+      <!-- Spectograms -->
+      <h3>Mel Spectrum of Microphone Input</h3>
       <canvas id="fft-series mel" height="0"></canvas>
 
-      <h3>Prediction window</h3>
-      <canvas id="fft-series pred" height="0"></canvas>
+      <h3>Last Recognition Window</h3>
+      <canvas id="fft-series speech" height="0"></canvas>
 
+      <!-- Meter -->
       <div class="meter" id="meter">
         <h2>Meter</h2>
         <div class="meter_vad" id="meter_vad">
@@ -29,13 +30,13 @@
           <canvas id="vad meter" height="0"></canvas>
         </div>
 
-        <div class="meter_pred" id="meter_pred">
-          <h3>Prediction</h3>
-          <div id="pred meter container"></div>
+        <div class="meter_speech" id="meter_speech">
+          <h3>Speech Recognition Classification</h3>
+          <div id="speech meter container"></div>
         </div>
       </div>
-      <!-- <canvas id="pred meter" height="0"></canvas> -->
 
+      <!-- Speech Recognition -->
       <div class="row clickable-heading" id="speech-section-header">
         <h2>Speech Recognition</h2>
         <i class="fas fa-angle-double-up" id="icon-speech-rec"></i>
@@ -43,15 +44,15 @@
 
       <div class="speech-section" id="speech-section">
         <div class="row">
-          <input type="file" value="" id="download-model-pred" accept=".json,.bin" multiple style="display: none;" />
-          <label for="download-model-pred" class="button">Load model</label>
-          <label for="download-model-pred">not selected</label>
+          <input type="file" value="" id="download-model-speech" accept=".json,.bin" multiple style="display: none;" />
+          <label for="download-model-speech" class="button">Load model</label>
+          <label for="download-model-speech">not selected</label>
         </div>
 
         <div class="row">
-          <input type="file" value="" id="download-data-pred" accept=".txt" style="display: none;" />
-          <label for="download-data-pred" class="button">Load data</label>
-          <label for="download-data-pred">not selected</label>
+          <input type="file" value="" id="download-data-speech" accept=".txt" style="display: none;" />
+          <label for="download-data-speech" class="button">Load data</label>
+          <label for="download-data-speech">not selected</label>
         </div>
 
         <div class="row" id="record_btns"></div>
@@ -59,18 +60,19 @@
         <button id="showImages_btn">Show Records</button>
         <div class="row">
           <button class="train_btn" id="train_btn">Train</button>
-          <button id="show-accuracy">Show Accuracy</button>
-          <button id="show-confusion">Show Confusion Matrix</button>
+          <button id="show-accuracy-speech">Show Accuracy</button>
+          <button id="show-confusion-speech">Show Confusion Matrix</button>
         </div>
 
         <div class="row">
-          <button class="save_model_btn_pred" id="save_model_btn_pred">Save model</button>
-          <button class="save_data_btn_pred" id="save_data_btn_pred">Save data</button>
+          <button class="save_model_btn_speech" id="save_model_btn_speech">Save model</button>
+          <button class="save_data_btn_speech" id="save_data_btn_speech">Save data</button>
         </div>
 
         <button class="predict_btn" id="predict_btn">Predict</button>
       </div>
 
+      <!-- Voice Activity Detection -->
       <div class="row clickable-heading" id="vad-section-header">
         <h2>Voice Activity Detection</h2>
         <i class="fas fa-angle-double-up" id="icon-vad"></i>
@@ -108,7 +110,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.0.2/dist/tfjs-vis.umd.min.js"></script>
 
-    <script src="Store.js"></script>
     <script src="utils.js"></script>
     <script src="circularBuffer.js"></script>
     <script src="windowing.js"></script>
@@ -116,7 +117,7 @@
     <script src="mel_filter.js"></script>
     <script src="dataset.js"></script>
     <script src="imageAugmentation.js"></script>
-    <script src="tfmodel.js"></script>
+    <script src="tfmodel_speech.js"></script>
     <script src="tfmodel_vad.js"></script>
     <script src="mainapp.js"></script>
   </body>

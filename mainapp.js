@@ -44,9 +44,9 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
-const VAD_RESULT = []; // result of VAD
-const VAD_THRESHOLD = 0.7;
-const THRESHOLD = 0.9;
+const VAD_RESULT = []; // result of VAD saved in an array
+const VAD_THRESHOLD = 0.7; // the VAD threshold, if hit do speech recognition otherwise not
+const THRESHOLD = 0.9; // threshold if speech class is recognized or not
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
 let VAD_LAST_POS = 0;
@@ -54,11 +54,11 @@ let VAD_AVERAGE = 0;
 
 // Datasets
 const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
-const dataset = createDataset(NCLASSES, undefined, undefined, 0.2);
+const dataset_speech = createDataset(NCLASSES, undefined, undefined, 0.2);
 const dataset_vad = createDataset(2, VAD_SIZE, N_MEL_FILTER, 0.2);
-let trained_data = undefined;
+let trained_data_speech = undefined;
 let trained_data_vad = undefined;
-let is_trained = false;
+let is_trained_speech = false;
 let is_trained_vad = false;
 
 // Data augmentation
@@ -68,13 +68,13 @@ const opt = { fill_mode: 'nearest' };
 const generator = createImageDataGenerator(opt);
 
 // Neural Network
-let nn = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, NCLASSES);
-let model;
+let nn_speech = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, NCLASSES);
+let model_speech;
 const nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2);
 let model_vad;
 const MEAN_NORMALIZE = false; // false -> standardize
-const PRED_IMG = [];
-const PRED_INTERVALL = 250;
+const SPEECH_IMG = [];
+const PRED_INTERVAL = 250;
 const PRED_SUSPEND = 4; // suspend prediction x times intervall
 let suspend = 1;
 
@@ -102,8 +102,8 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
 }
 
 for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-  let pred_array = Array.from(Array(N_MEL_FILTER), () => 255);
-  PRED_IMG.push(pred_array);
+  let speech_array = Array.from(Array(N_MEL_FILTER), () => 255);
+  SPEECH_IMG.push(speech_array);
 }
 
 for (let idx = 0; idx < VAD_SIZE; idx++) {
@@ -119,13 +119,13 @@ let canvas_fftSeries;
 let context_fftSeries;
 let canvas_fftSeries_mel;
 let context_fftSeries_mel;
-let canvas_fftSeries_pred;
-let context_fftSeries_pred;
+let canvas_fftSeries_speech;
+let context_fftSeries_speech;
 let canvas_vad_meter;
 let context_vad_meter;
-let canvas_pred_meter = [];
-let context_pred_meter = [];
-let label_pred = [];
+let canvas_speech_meter = [];
+let context_speech_meter = [];
+let label_speech = [];
 (function create_some_stuff() {
   if (drawit[0]) {
     canvas = document.getElementById('oscilloscope');
@@ -149,20 +149,20 @@ let label_pred = [];
   }
 
   if (drawit[3]) {
-    canvas_fftSeries_pred = document.getElementById('fft-series pred');
-    context_fftSeries_pred = canvas_fftSeries_pred.getContext('2d');
-    canvas_fftSeries_pred.width = 4 * RB_SIZE_FRAMING;
-    canvas_fftSeries_pred.height = 4 * N_MEL_FILTER;
+    canvas_fftSeries_speech = document.getElementById('fft-series speech');
+    context_fftSeries_speech = canvas_fftSeries_speech.getContext('2d');
+    canvas_fftSeries_speech.width = 4 * RB_SIZE_FRAMING;
+    canvas_fftSeries_speech.height = 4 * N_MEL_FILTER;
   }
 
   if (drawit[4]) {
     canvas_vad_meter = document.getElementById('vad meter');
     context_vad_meter = canvas_vad_meter.getContext('2d');
-    canvas_vad_meter.width = canvas_fftSeries_pred.width;
+    canvas_vad_meter.width = canvas_fftSeries_speech.width;
     canvas_vad_meter.height = 40;
 
-    //create pred canvas dynamically
-    const container = document.getElementById('pred meter container');
+    //create speech canvas dynamically
+    const container = document.getElementById('speech meter container');
     for (let classIdx = 0; classIdx < NCLASSES; classIdx++) {
       const subcontainer = document.createElement('div');
       subcontainer.classList.add('row');
@@ -170,12 +170,12 @@ let label_pred = [];
       let canvas = document.createElement('canvas');
       canvas.width = 4 * RB_SIZE_FRAMING;
       canvas.height = 40;
-      canvas.id = `pred class${classIdx + 1}`;
+      canvas.id = `speech class${classIdx + 1}`;
       const label = document.createElement('label');
       label.innerHTML = `class${classIdx + 1}`;
-      label.htmlFor = `pred class${classIdx + 1}`;
+      label.htmlFor = `speech class${classIdx + 1}`;
 
-      label_pred.push(label);
+      label_speech.push(label);
 
       let context = canvas.getContext('2d');
 
@@ -184,8 +184,8 @@ let label_pred = [];
 
       container.appendChild(subcontainer);
       //container.appendChild(document.createElement('br'));
-      canvas_pred_meter.push(canvas);
-      context_pred_meter.push(context);
+      canvas_speech_meter.push(canvas);
+      context_speech_meter.push(context);
     }
   }
 })();
@@ -393,12 +393,12 @@ function showMeter_VAD() {
   meter_vad_div.style.display = 'block';
 }
 
-function showMeter_pred() {
+function showMeter_speech() {
   let meter_div = document.getElementById('meter');
   meter_div.style.display = 'block';
 
-  let meter_pred_div = document.getElementById('meter_pred');
-  meter_pred_div.style.display = 'block';
+  let meter_speech_div = document.getElementById('meter_speech');
+  meter_speech_div.style.display = 'block';
 }
 
 /**
@@ -529,30 +529,30 @@ const draw = function () {
 
   // Draw Pred image
   if (drawit[3]) {
-    context_fftSeries_pred.fillStyle = '#FFF';
-    context_fftSeries_pred.fillRect(0, 0, canvas_fftSeries_pred.width, canvas_fftSeries_pred.height);
+    context_fftSeries_speech.fillStyle = '#FFF';
+    context_fftSeries_speech.fillRect(0, 0, canvas_fftSeries_speech.width, canvas_fftSeries_speech.height);
 
-    rectHeight = canvas_fftSeries_pred.height / N_MEL_FILTER;
-    rectWidth = canvas_fftSeries_pred.width / RB_SIZE_FRAMING;
-    let xpos = (PRED_IMG.length + 2) * rectWidth; // magic
+    rectHeight = canvas_fftSeries_speech.height / N_MEL_FILTER;
+    rectWidth = canvas_fftSeries_speech.width / RB_SIZE_FRAMING;
+    let xpos = (SPEECH_IMG.length + 2) * rectWidth; // magic
 
-    for (let xidx = 0; xidx < PRED_IMG.length; xidx++) {
-      ypos = canvas_fftSeries_pred.height;
+    for (let xidx = 0; xidx < SPEECH_IMG.length; xidx++) {
+      ypos = canvas_fftSeries_speech.height;
       for (let yidx = 0; yidx < N_MEL_FILTER; yidx++) {
-        mag = PRED_IMG[xidx][yidx];
+        mag = SPEECH_IMG[xidx][yidx];
         mag = Math.round(mag);
-        context_fftSeries_pred.fillStyle = utils.rainbow[mag];
-        context_fftSeries_pred.fillRect(xpos, ypos, rectWidth, -rectHeight);
+        context_fftSeries_speech.fillStyle = utils.rainbow[mag];
+        context_fftSeries_speech.fillRect(xpos, ypos, rectWidth, -rectHeight);
         ypos -= rectHeight;
       }
       xpos += rectWidth;
     }
 
-    context_fftSeries_pred.strokeRect(
-      (PRED_IMG.length + 2) * rectWidth,
+    context_fftSeries_speech.strokeRect(
+      (SPEECH_IMG.length + 2) * rectWidth,
       0,
-      canvas_fftSeries_pred.width,
-      canvas_fftSeries_pred.height
+      canvas_fftSeries_speech.width,
+      canvas_fftSeries_speech.height
     );
   }
 
@@ -643,14 +643,14 @@ function record(e, label) {
     utils.standardize(image);
   }
 
-  dataset.addImage(image, label);
+  dataset_speech.addImage(image, label);
 
   for (let idx = 0; idx < N_AUG; idx++) {
     let augImg = generator.horizontalShift(image, FRACTION);
-    dataset.addImage(augImg, label);
+    dataset_speech.addImage(augImg, label);
   }
 
-  e.target.labels[0].innerHTML = `${dataset.getNumImages(label)}`;
+  e.target.labels[0].innerHTML = `${dataset_speech.getNumImages(label)}`;
   console.log('recording finished');
   toggleButtons(false);
 } // end recording
@@ -759,18 +759,18 @@ train_btn.addEventListener('click', async () => {
     model = nn.getModel();
   } else {
     //nn_vad.freezeModelforTransferLearning(model_vad);
-    console.log('continue training with new dataset');
+    console.log('continue training with new speech dataset');
     nn.compile_model(model);
   }
 
   tfvis.show.modelSummary({ name: 'Model Summary' }, model);
-  trained_data = dataset.getData();
-  await nn.train(trained_data.x, trained_data.y, model);
-  is_trained = true;
+  trained_data_speech = dataset_speech.getData();
+  await nn.train(trained_data_speech.x, trained_data_speech.y, model);
+  is_trained_speech = true;
   console.log('training finished');
 
-  showAccuracy();
-  showConfusion();
+  showAccuracy_speech();
+  showConfusion_speech();
 
   togglePredictButton(false);
   //TODO: toggleAccuracy
@@ -784,7 +784,7 @@ train_btn_vad.addEventListener('click', async () => {
     model_vad = nn_vad.getModel();
   } else {
     //nn_vad.freezeModelforTransferLearning(model_vad);
-    console.log('continue training with new dataset');
+    console.log('continue training with new vad dataset');
     nn_vad.compile_model(model_vad);
   }
 
@@ -805,7 +805,7 @@ train_btn_vad.addEventListener('click', async () => {
 function predict(endFrame) {
   //console.log(utils.getTime());
 
-  showMeter_pred();
+  showMeter_speechnn();
 
   let startFrame = endFrame - RECORD_SIZE_FRAMING;
   if (startFrame < 0) {
@@ -821,7 +821,7 @@ function predict(endFrame) {
     curpos = startFrame;
     for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
       image[idx] = Array.from(LOG_MEL_RAW[curpos]);
-      PRED_IMG[idx] = Array.from(LOG_MEL[curpos]);
+      SPEECH_IMG[idx] = Array.from(LOG_MEL[curpos]);
 
       curpos++;
       if (curpos >= RB_SIZE_FRAMING) {
@@ -862,11 +862,11 @@ function predict(endFrame) {
     tf.tidy(() => {
       predict(Data_Pos);
     });
-  }, PRED_INTERVALL * suspend);
+  }, PRED_INTERVAL * suspend);
 }
 
 function showPrediction(result) {
-  const inputs = dataset.getInputs();
+  const inputs = dataset_speech.getInputs();
   utils.assert(result.length == inputs.length);
 
   const maxIdx = utils.indexOfMax(result);
@@ -874,21 +874,21 @@ function showPrediction(result) {
 
   for (let idx = 0; idx < result.length; idx++) {
     if (idx == maxIdx) {
-      label_pred[idx].style.color = 'red';
+      label_speech[idx].style.color = 'red';
     } else {
-      label_pred[idx].style.color = null;
+      label_speech[idx].style.color = null;
     }
 
-    const rectHeight = canvas_pred_meter[idx].height;
-    const rectWidth = canvas_pred_meter[idx].width;
-    context_pred_meter[idx].clearRect(0, 0, rectWidth, rectHeight);
+    const rectHeight = canvas_speech_meter[idx].height;
+    const rectWidth = canvas_speech_meter[idx].width;
+    context_speech_meter[idx].clearRect(0, 0, rectWidth, rectHeight);
 
     if (result[idx] > THRESHOLD) {
-      context_pred_meter[idx].fillStyle = 'red';
+      context_speech_meter[idx].fillStyle = 'red';
     } else {
-      context_pred_meter[idx].fillStyle = 'green';
+      context_speech_meter[idx].fillStyle = 'green';
     }
-    context_pred_meter[idx].fillRect(0, 0, result[idx] * rectWidth, rectHeight);
+    context_speech_meter[idx].fillRect(0, 0, result[idx] * rectWidth, rectHeight);
   }
 }
 
@@ -897,7 +897,7 @@ predict_btn.addEventListener('click', () => {
   //   tf.tidy(() => {
   //     predict(Data_Pos);
   //   });
-  // }, PRED_INTERVALL * suspend);
+  // }, PRED_INTERVAL * suspend);
 
   tf.tidy(() => {
     predict(Data_Pos);
@@ -919,7 +919,7 @@ showImages_btn.addEventListener('click', async () => {
   drawArea.innerHTML = '';
   const MAX = 20;
 
-  const inputs = dataset.getInputs();
+  const inputs = dataset_speech.getInputs();
 
   for (let classIdx = 0; classIdx < inputs.length; classIdx++) {
     const p = document.createElement('p');
@@ -953,10 +953,10 @@ save_model_btn_vad.addEventListener('click', async () => {
 /**
  * save Speech Rec model to file
  */
-const save_model_btn = document.getElementById('save_model_btn_pred');
+const save_model_btn = document.getElementById('save_model_btn_speech');
 save_model_btn.addEventListener('click', async () => {
   utils.assert(model != undefined, 'speech model undefined');
-  utils.assert(is_trained == true, 'not trained yet?');
+  utils.assert(is_trained_speech == true, 'not trained yet?');
   const filename = 'speech_model_name';
   console.log(await model.save(`downloads://${filename}`));
 });
@@ -995,7 +995,7 @@ load_model_file_vad.addEventListener('change', async (e) => {
  * load Speech model
  * user has to select json and bin file
  */
-const load_model_file = document.getElementById('download-model-pred');
+const load_model_file = document.getElementById('download-model-speech');
 load_model_file.addEventListener('change', async (e) => {
   utils.assert(e.target.files.length == 2, 'select one json and one bin file for model');
   e.target.labels[1].innerHTML = '';
@@ -1037,10 +1037,10 @@ save_data_btn_vad.addEventListener('click', async () => {
  * save recorded speech images
  * can be loaded and extended for further training
  */
-const save_data_btn = document.getElementById('save_data_btn_pred');
+const save_data_btn = document.getElementById('save_data_btn_speech');
 save_data_btn.addEventListener('click', async () => {
   const filename = 'speech_model';
-  const inputs = dataset.getInputs();
+  const inputs = dataset_speech.getInputs();
   console.log('saving speech data:', inputs.length);
   utils.download(JSON.stringify(inputs), `${filename}`, 'text/plain');
 });
@@ -1072,7 +1072,7 @@ load_data_file_vad.addEventListener('change', (e) => {
  * clear all currently recorded images !
  * has to be the same number of classes and dimension
  */
-const load_data_file = document.getElementById('download-data-pred');
+const load_data_file = document.getElementById('download-data-speech');
 load_data_file.addEventListener('change', (e) => {
   const file = e.target.files[0];
   console.log('loading speech date from', file.name);
@@ -1081,8 +1081,8 @@ load_data_file.addEventListener('change', (e) => {
     let res = event.target.result;
     let textByLine = res.split('\n');
     let newInputs = JSON.parse(textByLine);
-    dataset.clearInputs();
-    dataset.setInputs(newInputs);
+    dataset_speech.clearInputs();
+    dataset_speech.setInputs(newInputs);
     e.target.labels[1].innerHTML = file.name;
   });
   //reader.readAsDataURL(file);
@@ -1092,18 +1092,18 @@ load_data_file.addEventListener('change', (e) => {
 /**
  * Accuracy and Confusion Matrix
  */
-function doPrediction() {
-  utils.assert(trained_data != undefined, 'not trained');
+function doPrediction_speech() {
+  utils.assert(trained_data_speech != undefined, 'speech data not trained');
 
-  const testxs = trained_data.x_validation;
-  const labels = trained_data.y_validation.argMax([-1]);
+  const testxs = trained_data_speech.x_validation;
+  const labels = trained_data_speech.y_validation.argMax([-1]);
   const preds = model.predict(testxs).argMax([-1]);
   testxs.dispose();
   return [preds, labels];
 }
 
-async function showAccuracy() {
-  const [preds, labels] = doPrediction();
+async function showAccuracy_speech() {
+  const [preds, labels] = doPrediction_speech();
 
   const classAccuracy = await tfvis.metrics.perClassAccuracy(labels, preds);
   const container = {
@@ -1112,7 +1112,7 @@ async function showAccuracy() {
   };
 
   let classNames = [];
-  const inputs = dataset.getInputs();
+  const inputs = dataset_speech.getInputs();
   for (let idx = 0; idx < inputs.length; idx++) {
     classNames.push(inputs[idx].label);
   }
@@ -1121,15 +1121,15 @@ async function showAccuracy() {
   labels.dispose();
 }
 
-async function showConfusion() {
-  const [preds, labels] = doPrediction();
+async function showConfusion_speech() {
+  const [preds, labels] = doPrediction_speech();
   const confusionMatrix = await tfvis.metrics.confusionMatrix(labels, preds);
   const container = {
     name: 'Confusion Matrix',
     tab: 'Evaluation',
   };
   let classNames = [];
-  const inputs = dataset.getInputs();
+  const inputs = dataset_speech.getInputs();
   for (let idx = 0; idx < inputs.length; idx++) {
     classNames.push(inputs[idx].label);
   }
@@ -1144,7 +1144,7 @@ async function showConfusion() {
  * Accuracy and Confusion Matrix Vad
  */
 function doPrediction_vad() {
-  utils.assert(trained_data_vad != undefined, 'not trained');
+  utils.assert(trained_data_vad != undefined, 'vad data not trained');
 
   const testxs = trained_data_vad.x_validation;
   const labels = trained_data_vad.y_validation.argMax([-1]);
@@ -1191,8 +1191,8 @@ async function showConfusion_vad() {
   labels.dispose();
 }
 
-document.querySelector('#show-accuracy').addEventListener('click', () => showAccuracy());
-document.querySelector('#show-confusion').addEventListener('click', () => showConfusion());
+document.querySelector('#show-accuracy-speech').addEventListener('click', () => showAccuracy_speech());
+document.querySelector('#show-confusion-speech').addEventListener('click', () => showConfusion_speech());
 document.querySelector('#show-accuracy-vad').addEventListener('click', () => showAccuracy_vad());
 document.querySelector('#show-confusion-vad').addEventListener('click', () => showConfusion_vad());
 

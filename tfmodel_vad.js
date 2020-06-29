@@ -1,5 +1,5 @@
 /**
- * Model CNN
+ * CNN Model for Voice Activity Detection
  */
 
 function createNetwork_VAD(width, height, nClasses) {

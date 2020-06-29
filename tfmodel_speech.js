@@ -1,5 +1,5 @@
 /**
- * Model CNN
+ * CNN Model for Speech Recognition
  */
 
 function createNetwork(width, height, nClasses) {
