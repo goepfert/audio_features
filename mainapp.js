@@ -45,7 +45,7 @@ const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD saved in an array
-const VAD_THRESHOLD = 0.7; // the VAD threshold, if hit do speech recognition otherwise not
+const VAD_THRESHOLD = 0.6; // the VAD threshold, if hit do speech recognition otherwise not
 const THRESHOLD = 0.9; // threshold if speech class is recognized or not
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
@@ -755,17 +755,17 @@ function toggleButtons(flag) {
 train_btn.addEventListener('click', async () => {
   toggleButtons(true);
 
-  if (model == undefined) {
-    model = nn.getModel();
+  if (model_speech == undefined) {
+    model_speech = nn_speech.getModel();
   } else {
     //nn_vad.freezeModelforTransferLearning(model_vad);
     console.log('continue training with new speech dataset');
-    nn.compile_model(model);
+    nn_speech.compile_model(model_speech);
   }
 
-  tfvis.show.modelSummary({ name: 'Model Summary' }, model);
+  tfvis.show.modelSummary({ name: 'Model Summary' }, model_speech);
   trained_data_speech = dataset_speech.getData();
-  await nn.train(trained_data_speech.x, trained_data_speech.y, model);
+  await nn_speech.train(trained_data_speech.x, trained_data_speech.y, model_speech);
   is_trained_speech = true;
   console.log('training finished');
 
@@ -805,7 +805,7 @@ train_btn_vad.addEventListener('click', async () => {
 function predict(endFrame) {
   //console.log(utils.getTime());
 
-  showMeter_speechnn();
+  showMeter_speech();
 
   let startFrame = endFrame - RECORD_SIZE_FRAMING;
   if (startFrame < 0) {
@@ -841,9 +841,9 @@ function predict(endFrame) {
 
     let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
 
-    utils.assert(model != undefined, 'not trained yet?');
+    utils.assert(model_speech != undefined, 'not trained yet?');
 
-    model
+    model_speech
       .predict(x)
       .data()
       .then((result) => {
@@ -955,10 +955,10 @@ save_model_btn_vad.addEventListener('click', async () => {
  */
 const save_model_btn = document.getElementById('save_model_btn_speech');
 save_model_btn.addEventListener('click', async () => {
-  utils.assert(model != undefined, 'speech model undefined');
+  utils.assert(model_speech != undefined, 'speech model undefined');
   utils.assert(is_trained_speech == true, 'not trained yet?');
   const filename = 'speech_model_name';
-  console.log(await model.save(`downloads://${filename}`));
+  console.log(await model_speech.save(`downloads://${filename}`));
 });
 
 /**
@@ -1017,8 +1017,8 @@ load_model_file.addEventListener('change', async (e) => {
 
   e.target.labels[1].innerHTML = jsonFile.name + ', ' + binFile.name;
 
-  model = await tf.loadLayersModel(tf.io.browserFiles([jsonFile, binFile]));
-  console.log(model);
+  model_speech = await tf.loadLayersModel(tf.io.browserFiles([jsonFile, binFile]));
+  console.log(model_speech);
 });
 
 /**
@@ -1097,7 +1097,7 @@ function doPrediction_speech() {
 
   const testxs = trained_data_speech.x_validation;
   const labels = trained_data_speech.y_validation.argMax([-1]);
-  const preds = model.predict(testxs).argMax([-1]);
+  const preds = model_speech.predict(testxs).argMax([-1]);
   testxs.dispose();
   return [preds, labels];
 }
