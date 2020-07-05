@@ -1,3 +1,11 @@
+/**
+ * main app
+ *
+ * author: Thomas Goepfert
+ */
+
+'use strict';
+
 // It all starts with a context
 const context = new AudioContext({ samplerate: 48000 });
 
@@ -54,7 +62,7 @@ let VAD_AVERAGE = 0;
 
 // Datasets
 const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
-const dataset_speech = createDataset(NCLASSES, undefined, undefined, 0.2);
+const dataset_speech = createDataset(NCLASSES, RECORD_SIZE_FRAMING, N_MEL_FILTER, 0.2);
 const dataset_vad = createDataset(2, VAD_SIZE, N_MEL_FILTER, 0.2);
 let trained_data_speech = undefined;
 let trained_data_vad = undefined;

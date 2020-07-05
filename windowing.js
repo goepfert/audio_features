@@ -1,9 +1,11 @@
 /**
  * numbers found around the web
  * can be generalized for other windowing functions
- * 
+ *
  * implace
  */
+
+'use strict';
 
 function createWindowing(length) {
   const _LENGTH = length;

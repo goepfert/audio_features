@@ -1,6 +1,5 @@
 /**
  * create a new image based on an 2d array
- * cutoff some fraction from left or right side and fill the other side with zeros
  */
 
 'use strict';
@@ -26,6 +25,9 @@ function createImageDataGenerator(opt) {
     return options;
   }
 
+  /**
+   * cutoff some fraction from left or right side and fill the other side with ...
+   */
   function horizontalShift(buffer, fraction) {
     const nRow = buffer.length;
     let nCol = buffer[0].length;
