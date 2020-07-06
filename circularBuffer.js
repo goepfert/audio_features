@@ -8,6 +8,8 @@
  * author: Thomas Goepfert
  */
 
+'use strict';
+
 class CircularBuffer {
   constructor(length) {
     this.myBuffer = Array.from(Array(length), () => 0);

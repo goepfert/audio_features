@@ -2,6 +2,8 @@
  * http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/
  */
 
+'use strict';
+
 let mel_filter = function () {
   let _samplerate;
   let _nfft;

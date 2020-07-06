@@ -2,6 +2,8 @@
  * CNN Model for Voice Activity Detection
  */
 
+'use strict';
+
 function createNetwork_VAD(width, height, nClasses) {
   const IMAGE_WIDTH = width;
   const IMAGE_HEIGHT = height;

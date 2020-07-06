@@ -2,6 +2,8 @@
  *
  */
 
+'use strict';
+
 function createDataset(num_classes, img_width, img_height, fraction_validation) {
   let _num_classes = num_classes;
   let _fraction_validation = fraction_validation;

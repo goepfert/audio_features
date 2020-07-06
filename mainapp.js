@@ -489,11 +489,11 @@ const draw = function () {
     context_fftSeries_mel.fillStyle = '#FFF';
     context_fftSeries_mel.fillRect(0, 0, canvas_fftSeries_mel.width, canvas_fftSeries_mel.height);
 
-    rectHeight = canvas_fftSeries_mel.height / N_MEL_FILTER;
-    rectWidth = canvas_fftSeries_mel.width / RB_SIZE_FRAMING;
+    let rectHeight = canvas_fftSeries_mel.height / N_MEL_FILTER;
+    let rectWidth = canvas_fftSeries_mel.width / RB_SIZE_FRAMING;
     let xpos = 0;
     for (let xidx = Data_Pos; xidx < Data_Pos + RB_SIZE_FRAMING; xidx++) {
-      ypos = canvas_fftSeries_mel.height;
+      let ypos = canvas_fftSeries_mel.height;
       for (let yidx = 0; yidx < N_MEL_FILTER; yidx++) {
         mag = LOG_MEL[xidx % RB_SIZE_FRAMING][yidx];
         mag = Math.round(mag);
@@ -540,12 +540,12 @@ const draw = function () {
     context_fftSeries_speech.fillStyle = '#FFF';
     context_fftSeries_speech.fillRect(0, 0, canvas_fftSeries_speech.width, canvas_fftSeries_speech.height);
 
-    rectHeight = canvas_fftSeries_speech.height / N_MEL_FILTER;
-    rectWidth = canvas_fftSeries_speech.width / RB_SIZE_FRAMING;
+    let rectHeight = canvas_fftSeries_speech.height / N_MEL_FILTER;
+    let rectWidth = canvas_fftSeries_speech.width / RB_SIZE_FRAMING;
     let xpos = (SPEECH_IMG.length + 2) * rectWidth; // magic
 
     for (let xidx = 0; xidx < SPEECH_IMG.length; xidx++) {
-      ypos = canvas_fftSeries_speech.height;
+      let ypos = canvas_fftSeries_speech.height;
       for (let yidx = 0; yidx < N_MEL_FILTER; yidx++) {
         mag = SPEECH_IMG[xidx][yidx];
         mag = Math.round(mag);
@@ -820,13 +820,13 @@ function predict(endFrame) {
     startFrame = RB_SIZE_FRAMING + startFrame;
   }
 
-  console.log(utils.getTime(), 'voice activity detected:', VAD_AVERAGE);
+  //console.log(utils.getTime(), 'voice activity detected:', VAD_AVERAGE);
 
   if (VAD_AVERAGE > VAD_THRESHOLD || model_vad == undefined) {
     suspend = PRED_SUSPEND;
 
     let image = [];
-    curpos = startFrame;
+    let curpos = startFrame;
     for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
       image[idx] = Array.from(LOG_MEL_RAW[curpos]);
       SPEECH_IMG[idx] = Array.from(LOG_MEL[curpos]);
@@ -1003,8 +1003,8 @@ load_model_file_vad.addEventListener('change', async (e) => {
  * load Speech model
  * user has to select json and bin file
  */
-const load_model_file = document.getElementById('download-model-speech');
-load_model_file.addEventListener('change', async (e) => {
+const load_model_file_speech = document.getElementById('download-model-speech');
+load_model_file_speech.addEventListener('change', async (e) => {
   utils.assert(e.target.files.length == 2, 'select one json and one bin file for model');
   e.target.labels[1].innerHTML = '';
 
@@ -1019,8 +1019,8 @@ load_model_file.addEventListener('change', async (e) => {
     binFile = e.target.files[0];
   }
 
-  utils.assert(model_vad == undefined, 'speech model already defined?'); //overwrite????
-  utils.assert(is_trained_vad == false, 'speech model already trained?');
+  utils.assert(model_speech == undefined, 'speech model already defined?'); //overwrite????
+  utils.assert(is_trained_speech == false, 'speech model already trained?');
   console.log('loading speech model from', jsonFile.name, binFile.name);
 
   e.target.labels[1].innerHTML = jsonFile.name + ', ' + binFile.name;

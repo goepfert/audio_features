@@ -2,6 +2,8 @@
  * CNN Model for Speech Recognition
  */
 
+'use strict';
+
 function createNetwork(width, height, nClasses) {
   const IMAGE_WIDTH = width;
   const IMAGE_HEIGHT = height;

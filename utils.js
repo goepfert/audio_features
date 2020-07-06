@@ -2,6 +2,8 @@
  * Collection of some usefull functions
  */
 
+'use strict';
+
 const utils = (function () {
   const _grayscale = [];
   const _rainbow = [];
@@ -200,7 +202,7 @@ const utils = (function () {
   }
 
   function download(content, fileName, contentType) {
-    let a = document.createElement("a");
+    let a = document.createElement('a');
     let file = new Blob([content], { type: contentType });
     a.href = URL.createObjectURL(file);
     a.download = fileName;
@@ -208,9 +210,6 @@ const utils = (function () {
   }
 
   function sleep(milliseconds) {
-
-    
-
     const date = Date.now();
     let currentDate = null;
     do {
