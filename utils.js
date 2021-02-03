@@ -168,7 +168,7 @@ const utils = (function () {
     let sigma = 0;
     for (let row = 0; row < nRow; row++) {
       for (let col = 0; col < nCol; col++) {
-        mean = buffer2D[row][col];
+        mean += buffer2D[row][col];
       }
     }
     mean /= nRow * nCol;
