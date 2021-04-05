@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- <link rel="stylesheet" href="css/skeleton.css" /> -->
+    <link rel="stylesheet" href="css/style.css" />
+    <script src="https://kit.fontawesome.com/e003a6f9a1.js" crossorigin="anonymous"></script>
+    <title>audio features</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Speech Recognition and Voice Activity Detection Example</h1>
+
+      Code available on <a href="https://github.com/goepfert/audio_features">GitHub</a>. <br />
+
+      Since I cannot preload the model files, you need to do this by yourself (via user interaction). First load the
+      voice activity model by clicking the <i>Load VAD Model</i> button and multiselect the vad model
+      <i>vad_model_name.json</i> and <i>vad_model_name.bin</i> located in the data folder (shift + clicking the two
+      files).
+
+      <!-- <canvas id="oscilloscope" height="0"></canvas>
+      <canvas id="fft-series" height="0"></canvas> -->
+
+      <!-- Spectograms -->
+      <h3>Mel Spectrum of Microphone Input and Voice Activity Level</h3>
+      <canvas id="fft-series mel" height="0"></canvas>
+
+      <h3>Last Recognition Window</h3>
+      <canvas id="fft-series speech" height="0"></canvas>
+
+      <!-- Meter -->
+      <div class="meter" id="meter">
+        <h2>Meter</h2>
+        <div class="meter_vad" id="meter_vad">
+          <h3>Voice Activity Detection</h3>
+          <canvas id="vad meter" height="0"></canvas>
+        </div>
+
+        <div class="meter_speech" id="meter_speech">
+          <h3>Speech Recognition Classification</h3>
+          <div id="speech meter container"></div>
+        </div>
+      </div>
+
+      <!-- Speech Recognition -->
+      <div class="row clickable-heading" id="speech-section-header">
+        <h2>Voice Activity Detection and Speech Recognition</h2>
+        <i class="fas fa-angle-double-up" id="icon-speech-rec"></i>
+      </div>
+
+      <div class="speech-section" id="speech-section">
+        <div class="row">
+          <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none" />
+          <label for="download-model-vad" class="button">1. Load VAD Model</label>
+          <label for="download-model-vad">multiselect json and bin file of vad model in data folder</label>
+        </div>
+
+        <div class="row">
+          <input type="file" value="" id="download-model-speech" accept=".json,.bin" multiple style="display: none" />
+          <label for="download-model-speech" class="button">2. Load Speech Model</label>
+          <label for="download-model-speech">multiselect json and bin file of speech model in data folder</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.0.2/dist/tfjs-vis.umd.min.js"></script>
+
+    <script src="utils.js"></script>
+    <script src="circularBuffer.js"></script>
+    <script src="windowing.js"></script>
+    <script src="fft.js"></script>
+    <script src="mel_filter.js"></script>
+    <script src="dataset.js"></script>
+    <script src="imageAugmentation.js"></script>
+    <script src="tfmodel_speech.js"></script>
+    <script src="tfmodel_vad.js"></script>
+    <script src="mainapp.js"></script>
+  </body>
+</html>

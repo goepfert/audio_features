@@ -51,6 +51,7 @@ filter.init(samplerate, FRAME_SIZE, MIN_FREQUENCY, MAX_FREQUENCY, N_MEL_FILTER);
 // I want to get an quadratic image, thus
 const VAD_SIZE = N_MEL_FILTER;
 const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) / samplerate;
+console.log('VAD TIME', VAD_TIME);
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD saved in an array
 const VAD_THRESHOLD = 0.6; // the VAD threshold, if hit do speech recognition otherwise not
@@ -61,7 +62,7 @@ let VAD_LAST_POS = 0;
 let VAD_AVERAGE = 0;
 
 // Datasets
-const NCLASSES = 4; // How many classes to classify (normally, the first class refers to the background)
+const NCLASSES = 9; // How many classes to classify (normally, the first class refers to the background)
 const dataset_speech = createDataset(NCLASSES, RECORD_SIZE_FRAMING, N_MEL_FILTER, 0.2);
 const dataset_vad = createDataset(2, VAD_SIZE, N_MEL_FILTER, 0.2);
 let trained_data_speech = undefined;

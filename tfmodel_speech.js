@@ -83,7 +83,7 @@ function createNetwork(width, height, nClasses) {
   }
 
   function compile_model(model) {
-    const optimizer = tf.train.adam();
+    const optimizer = tf.train.adam(3e-4);
     model.compile({
       optimizer: optimizer,
       loss: 'categoricalCrossentropy',
@@ -105,7 +105,7 @@ function createNetwork(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 15,
+      epochs: 20,
       shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,
