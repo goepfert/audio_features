@@ -132,8 +132,8 @@ You can record sound examples (classes to classify) with your microphone. You ca
 
 ## Resources
 
-[Mel Frequency Cepstral Coefficient (MFCC) tutorial](http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/)
-[Audio Model with TensorFlow.js with Ping Yu](https://www.youtube.com/watch?v=-1QGEQWhmSI)
-[A Convolutional Neural Network Smartphone App for Real-Time Voice Activity Detection](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6150492/)
+- [Mel Frequency Cepstral Coefficient (MFCC) tutorial](http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/)
+- [Audio Model with TensorFlow.js with Ping Yu](https://www.youtube.com/watch?v=-1QGEQWhmSI)
+- [A Convolutional Neural Network Smartphone App for Real-Time Voice Activity Detection](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6150492/)
 
 Tons of information from the some cool people found on the internet!
