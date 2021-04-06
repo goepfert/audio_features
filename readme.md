@@ -3,7 +3,7 @@
 Demonstrator project for speech recognition featuring several technologies:
 
 - Web Audio API
-- Mel Frequency Cepstral Coefficients
+- Mel Frequency Cepstral Coefficients (MFCC)
 - Convolutional Neural Networks (with tensorlow.js)
 - Voice Activity Detection
 - Speech Recognition (phrase detection of about 1 second)
@@ -11,11 +11,29 @@ Demonstrator project for speech recognition featuring several technologies:
 
 It can classify some number of spoken words, for expample, if voice activity was detected. All it's running in the clients browser.
 
-Some tests located in the _test_ folder and are only here for reference.
+## Example
 
-Some not used algorithms located in the _tmp_ folder. E.g. the not so fast direct fourier transformation or the direct cosine transform. They are just here for the record but not needed (anymore).
+Before going into details, checkout a working [Demo](https://goepfert.github.io/audio_features/). It uses a pretrained model done by myself with my own voice and cheap microphone setup.
 
-## Workflow
+### VAD Model
+**Class 1 - Background**
+- 200 samples of silence, breathing, whisteling, scratching wooden table etc.
+
+**Class 2 - Voice**
+- 200 spoken samples while reading arbitrary book
+
+### Speech Model
+Nine classes of spoken words:
+- one, two, three, four
+- up, down, left, right
+- silence (probably not needed)
+
+Note that speech recognition is only triggered if voice activity was detected. In the demo the vad detection level was set to 60%. An activity is visualized by an green meter bar that turns red over 60%.
+
+The speech recognition level is then also indicated by meter bars that turn red if the probability over 90% has been reached.
+
+
+## Workflow of the Algorithm
 
 Record microphone input and get the samples with the help of the Web Audio API.
 
@@ -117,4 +135,5 @@ You can record sound examples (classes to classify) with your microphone. You ca
 [Mel Frequency Cepstral Coefficient (MFCC) tutorial](http://practicalcryptography.com/miscellaneous/machine-learning/guide-mel-frequency-cepstral-coefficients-mfccs/)
 [Audio Model with TensorFlow.js with Ping Yu](https://www.youtube.com/watch?v=-1QGEQWhmSI)
 [A Convolutional Neural Network Smartphone App for Real-Time Voice Activity Detection](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6150492/)
+
 Tons of information from the some cool people found on the internet!

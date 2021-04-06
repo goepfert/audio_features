@@ -1,6 +1,8 @@
 /**
  * main app
  *
+ * remark: rought cutout to get a working example
+ *
  * author: Thomas Goepfert
  */
 
@@ -683,71 +685,21 @@ function showPrediction(result) {
   }
 }
 
-/**
- * load VAD model
- * user has to select json and bin file
- */
-const load_model_file_vad = document.getElementById('download-model-vad');
-load_model_file_vad.addEventListener('change', async (e) => {
-  // utils.assert(e.target.files.length == 2, 'select one json and one bin file for model');
-  // e.target.labels[1].innerHTML = '';
-
-  // let jsonFile;
-  // let binFile;
-
-  // if (e.target.files[0].name.split('.').pop() == 'json') {
-  //   jsonFile = e.target.files[0];
-  //   binFile = e.target.files[1];
-  // } else {
-  //   jsonFile = e.target.files[1];
-  //   binFile = e.target.files[0];
-  // }
-
-  // utils.assert(model_vad == undefined, 'vad model already defined?'); //overwrite????
-  // utils.assert(is_trained_vad == false, 'vad model already trained?');
-  // console.log('loading vad model from', jsonFile.name, binFile.name);
-
-  // e.target.labels[1].innerHTML = jsonFile.name + ', ' + binFile.name;
-
-  // model_vad = await tf.loadLayersModel(tf.io.browserFiles([jsonFile, binFile]));
-
+async function init() {
   model_vad = await tf.loadLayersModel(
-    'https://github.com/goepfert/audio_features/tree/master/docs/data/vad_model_name.json'
+    'https://raw.githubusercontent.com/goepfert/audio_features/master/docs/data/vad_model_name.json'
+  );
+  console.log(model_vad);
+
+  model_speech = await tf.loadLayersModel(
+    'https://raw.githubusercontent.com/goepfert/audio_features/master/docs/data/speech_model_name.json'
   );
 
-  console.log(model_vad);
-});
-
-/**
- * load Speech model
- * user has to select json and bin file
- */
-const load_model_file_speech = document.getElementById('download-model-speech');
-load_model_file_speech.addEventListener('change', async (e) => {
-  utils.assert(e.target.files.length == 2, 'select one json and one bin file for model');
-  e.target.labels[1].innerHTML = '';
-
-  let jsonFile;
-  let binFile;
-
-  if (e.target.files[0].name.split('.').pop() == 'json') {
-    jsonFile = e.target.files[0];
-    binFile = e.target.files[1];
-  } else {
-    jsonFile = e.target.files[1];
-    binFile = e.target.files[0];
-  }
-
-  utils.assert(model_speech == undefined, 'speech model already defined?'); //overwrite????
-  utils.assert(is_trained_speech == false, 'speech model already trained?');
-  console.log('loading speech model from', jsonFile.name, binFile.name);
-
-  e.target.labels[1].innerHTML = jsonFile.name + ', ' + binFile.name;
-
-  model_speech = await tf.loadLayersModel(tf.io.browserFiles([jsonFile, binFile]));
   console.log(model_speech);
 
   tf.tidy(() => {
     predict(Data_Pos);
   });
-});
+}
+
+init();
