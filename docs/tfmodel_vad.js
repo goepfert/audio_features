@@ -91,7 +91,7 @@ function createNetwork_VAD(width, height, nClasses) {
   async function train(xs, ys, model) {
     // mhh: Which batch size shall I choose?
     // https://machinelearningmastery.com/gentle-introduction-mini-batch-gradient-descent-configure-batch-size/
-    const BATCH_SIZE = 8;
+    const BATCH_SIZE = 32;
     const metrics = ['loss', 'val_loss', 'acc', 'val_acc'];
     const container = {
       name: 'Model Training VAD',

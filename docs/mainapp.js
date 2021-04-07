@@ -9,9 +9,9 @@
 'use strict';
 
 // It all starts with a context
-const context = new AudioContext({ samplerate: 48000 });
+let audioContext; // = new AudioContext({ samplerate: 48000 });
 
-const samplerate = context.sampleRate;
+const samplerate = 48000;
 
 // Buffer sizes
 const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the mic)
@@ -56,8 +56,8 @@ const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) /
 console.log('VAD TIME', VAD_TIME);
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD saved in an array
-const VAD_THRESHOLD = 0.6; // the VAD threshold, if hit do speech recognition otherwise not
-const THRESHOLD = 0.9; // threshold if speech class is recognized or not
+const VAD_THRESHOLD = 0.5; // the VAD threshold, if hit do speech recognition otherwise not
+const THRESHOLD = 0.85; // threshold if speech class is recognized or not
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
 let VAD_LAST_POS = 0;
@@ -210,12 +210,15 @@ let label_speech = [];
  */
 const handleSuccess = function (stream) {
   console.log('handle success');
-  const source = context.createMediaStreamSource(stream);
+
+  audioContext = new AudioContext({ samplerate: samplerate });
+
+  const source = audioContext.createMediaStreamSource(stream);
 
   // Create a ScriptProcessorNode
-  const processor = context.createScriptProcessor(BUFFER_SIZE, 1, 1);
+  const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
   source.connect(processor);
-  processor.connect(context.destination);
+  processor.connect(audioContext.destination);
 
   processor.onaudioprocess = function (e) {
     const inputBuffer = e.inputBuffer;
