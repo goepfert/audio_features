@@ -108,7 +108,7 @@ function createNetwork_VAD(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 40,
+      epochs: 50,
       shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,
