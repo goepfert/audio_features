@@ -1,5 +1,7 @@
 /**
  * create a new image based on an 2d array
+ *
+ * TODO: if you want to do this right, you shall augment the timeseries and not the mel
  */
 
 'use strict';

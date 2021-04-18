@@ -7,9 +7,9 @@
 'use strict';
 
 // It all starts with a context
-const context = new AudioContext({ samplerate: 48000 });
+let audioContext; // = new AudioContext({ samplerate: 48000 });
 
-const samplerate = context.sampleRate;
+const samplerate = 48000;
 
 // Buffer sizes
 const BUFFER_SIZE = 1024; // the chunks we get from the input source (e.g. the mic)
@@ -29,7 +29,7 @@ const RB_SIZE_FRAMING = utils.getNumberOfFrames(RB_SIZE, FRAME_SIZE, FRAME_STRID
 const RECORD_SIZE_FRAMING = utils.getNumberOfFrames(RECORD_SIZE, FRAME_SIZE, FRAME_STRIDE); // number of frames in record
 let Data_Pos = 0; // head position
 const DFT_Data = []; // after fourier transform [B2P1][RB_SIZE_FRAMING]
-const LOG_MEL_RAW = []; // log mel filter coefficients
+const MEL_RAW = []; // log mel filter coefficients
 const LOG_MEL = []; // log mel filter coefficients after some scaling for visualization
 
 // Hamming Window
@@ -62,7 +62,7 @@ let VAD_LAST_POS = 0;
 let VAD_AVERAGE = 0;
 
 // Datasets
-const NCLASSES = 9; // How many classes to classify (normally, the first class refers to the background)
+const NCLASSES = 8; // How many classes to classify (normally, the first class refers to the background)
 const dataset_speech = createDataset(NCLASSES, RECORD_SIZE_FRAMING, N_MEL_FILTER, 0.2);
 const dataset_vad = createDataset(2, VAD_SIZE, N_MEL_FILTER, 0.2);
 let trained_data_speech = undefined;
@@ -81,7 +81,11 @@ let nn_speech = createNetwork(RECORD_SIZE_FRAMING, N_MEL_FILTER, NCLASSES);
 let model_speech;
 const nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2);
 let model_vad;
-const MEAN_NORMALIZE = false; // false -> standardize
+
+//const NORMALIZE_FCN = utils.minMaxNormalize;
+//const NORMALIZE_FCN = utils.meanNormalize;
+const NORMALIZE_FCN = utils.standardize;
+
 const SPEECH_IMG = [];
 const PRED_INTERVAL = 250;
 const PRED_SUSPEND = 4; // suspend prediction x times intervall
@@ -102,7 +106,7 @@ for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
   DFT_Data.push(ft_array);
 
   let mel_raw_array = Array.from(Array(N_MEL_FILTER), () => 0);
-  LOG_MEL_RAW.push(mel_raw_array);
+  MEL_RAW.push(mel_raw_array);
 
   let mel_array = Array.from(Array(N_MEL_FILTER), () => 255);
   LOG_MEL.push(mel_array);
@@ -204,12 +208,14 @@ let label_speech = [];
  */
 const handleSuccess = function (stream) {
   console.log('handle success');
-  const source = context.createMediaStreamSource(stream);
+
+  audioContext = new AudioContext({ samplerate: samplerate });
+  const source = audioContext.createMediaStreamSource(stream);
 
   // Create a ScriptProcessorNode
-  const processor = context.createScriptProcessor(BUFFER_SIZE, 1, 1);
+  const processor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
   source.connect(processor);
-  processor.connect(context.destination);
+  processor.connect(audioContext.destination);
 
   processor.onaudioprocess = function (e) {
     const inputBuffer = e.inputBuffer;
@@ -262,11 +268,11 @@ function doFraming() {
     const mag = fft.getPowerspectrum(frame_buffer);
     DFT_Data[Data_Pos] = utils.logRangeMapBuffer(mag, MIN_EXP, MAX_EXP, 255, 0);
 
-    // MelFilter;
-    let mel_array = filter.getLogMelCoefficients(mag);
-    //LOG_MEL_RAW[Data_Pos] = Array.from(mel_array);
-    LOG_MEL_RAW[Data_Pos] = mel_array;
-    LOG_MEL[Data_Pos] = utils.rangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
+    //let mel_array = filter.getLogMelCoefficients(mag);
+    let mel_array = filter.getMelCoefficients(mag);
+
+    MEL_RAW[Data_Pos] = mel_array;
+    LOG_MEL[Data_Pos] = utils.logRangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
 
     // Bookeeping
     Data_Pos = (Data_Pos + 1) % RB_SIZE_FRAMING;
@@ -300,7 +306,7 @@ function doVAD() {
 
   // copy image
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
-    VAD_IMG[idx] = Array.from(LOG_MEL_RAW[curpos]);
+    VAD_IMG[idx] = Array.from(MEL_RAW[curpos]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -311,11 +317,8 @@ function doVAD() {
     }
   }
 
-  if (MEAN_NORMALIZE) {
-    utils.meanNormalize(VAD_IMG);
-  } else {
-    utils.standardize(VAD_IMG);
-  }
+  utils.powerToDecibels2D(VAD_IMG);
+  //NORMALIZE_FCN(VAD_IMG);
 
   // make vad prediction and fill result
   // do some averaging when overlapping (does not look very efficient though)
@@ -635,7 +638,7 @@ function record(e, label) {
   let curpos = STARTFRAME;
 
   for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-    image[idx] = Array.from(LOG_MEL_RAW[curpos]);
+    image[idx] = Array.from(MEL_RAW[curpos]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -646,11 +649,8 @@ function record(e, label) {
     }
   }
 
-  if (MEAN_NORMALIZE) {
-    utils.meanNormalize(image);
-  } else {
-    utils.standardize(image);
-  }
+  utils.powerToDecibels2D(image);
+  NORMALIZE_FCN(image);
 
   dataset_speech.addImage(image, label);
 
@@ -689,7 +689,7 @@ function record_vad(e, label) {
   let curpos = STARTFRAME;
 
   for (let idx = 0; idx < VAD_SIZE; idx++) {
-    image[idx] = Array.from(LOG_MEL_RAW[curpos]);
+    image[idx] = Array.from(MEL_RAW[curpos]);
 
     curpos++;
     if (curpos >= RB_SIZE_FRAMING) {
@@ -700,11 +700,8 @@ function record_vad(e, label) {
     }
   }
 
-  if (MEAN_NORMALIZE) {
-    utils.meanNormalize(image);
-  } else {
-    utils.standardize(image);
-  }
+  utils.powerToDecibels2D(image);
+  //NORMALIZE_FCN(image);
 
   label = label.split(' ')[1]; // lovely ... :(
   dataset_vad.addImage(image, label);
@@ -829,7 +826,7 @@ function predict(endFrame) {
     let image = [];
     let curpos = startFrame;
     for (let idx = 0; idx < RECORD_SIZE_FRAMING; idx++) {
-      image[idx] = Array.from(LOG_MEL_RAW[curpos]);
+      image[idx] = Array.from(MEL_RAW[curpos]);
       SPEECH_IMG[idx] = Array.from(LOG_MEL[curpos]);
 
       curpos++;
@@ -841,12 +838,8 @@ function predict(endFrame) {
       }
     }
 
-    //check which what option the nn was trained!
-    if (MEAN_NORMALIZE) {
-      utils.meanNormalize(image);
-    } else {
-      utils.standardize(image);
-    }
+    utils.powerToDecibels2D(image);
+    NORMALIZE_FCN(image); //check which what option the nn was trained!
 
     let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
 

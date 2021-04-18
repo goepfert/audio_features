@@ -124,11 +124,10 @@ const utils = (function () {
     }
     mean /= nRow * nCol;
 
-    // console.log(mean, min, max);
-
+    const width = max - min;
     for (let row = 0; row < nRow; row++) {
       for (let col = 0; col < nCol; col++) {
-        buffer2D[row][col] = (buffer2D[row][col] - mean) / (max - min);
+        buffer2D[row][col] = (buffer2D[row][col] - mean) / width;
       }
     }
   }
@@ -153,9 +152,10 @@ const utils = (function () {
 
     // console.log(mean, min, max);
 
+    const width = max - min;
     for (let row = 0; row < nRow; row++) {
       for (let col = 0; col < nCol; col++) {
-        buffer2D[row][col] = (buffer2D[row][col] - min) / (max - min);
+        buffer2D[row][col] = (buffer2D[row][col] - min) / width;
       }
     }
   }
@@ -184,6 +184,24 @@ const utils = (function () {
     for (let row = 0; row < nRow; row++) {
       for (let col = 0; col < nCol; col++) {
         buffer2D[row][col] = (buffer2D[row][col] - mean) / sigma;
+      }
+    }
+  }
+
+  function powerToDecibels2D(buffer2D, min) {
+    // get max value in 2d array: https://stackoverflow.com/questions/39342575/max-value-of-a-multidimensional-array-javascript/39342787
+    let maxRow = buffer2D.map(function (row) {
+      return Math.max.apply(Math, row);
+    });
+    let MAX = Math.max.apply(null, maxRow);
+
+    for (let idx1 = 0; idx1 < buffer2D.length; idx1++) {
+      for (let idx2 = 0; idx2 < buffer2D[0].length; idx2++) {
+        let newValue = linearToDecibels(buffer2D[idx1][idx2] / MAX);
+        if (min !== undefined && newValue < min) {
+          newValue = min;
+        }
+        buffer2D[idx1][idx2] = newValue;
       }
     }
   }
@@ -217,6 +235,14 @@ const utils = (function () {
     } while (currentDate - date < milliseconds);
   }
 
+  function deepCopy1D(buffer1D) {
+    return buffer1D.slice();
+  }
+
+  function deepCopy2D(buffer2D) {
+    return buffer2D.slice().map((row) => row.slice());
+  }
+
   return {
     grayscale: _grayscale,
     rainbow: _rainbow,
@@ -235,8 +261,11 @@ const utils = (function () {
     meanNormalize: meanNormalize,
     minMaxNormalize: minMaxNormalize,
     standardize: standardize,
+    powerToDecibels2D: powerToDecibels2D,
     getTime: getTime,
     download: download,
     sleep: sleep,
+    deepCopy1D: deepCopy1D,
+    deepCopy2D: deepCopy2D,
   };
 })();

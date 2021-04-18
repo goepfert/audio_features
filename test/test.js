@@ -1,16 +1,21 @@
 let b = [
-  [1, 2],
-  [3, 4],
+  [0.1, 10],
+  [100, 1000],
   [5, 6],
   [7, 8],
 ];
 
-//console.table(b);
-//console.table(createImage(b, 0.5));
+// let b = [
+//   [-1, 1000],
+//   [10, 100],
+// ];
 
+console.log(utils.deepCopy2D(b));
 
-const ds = createDataset(2, 0);
+utils.powerToDecibels2D(b);
 
-ds.addImage(b, 'class1');
-ds.addImage(b, 'class2');
+console.log(utils.deepCopy2D(b));
 
+utils.meanNormalize(b);
+
+console.log(utils.deepCopy2D(b));

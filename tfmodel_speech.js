@@ -29,6 +29,7 @@ function createNetwork(width, height, nClasses) {
       })
     );
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
+    // model.add(tf.layers.batchNormalization());
 
     model.add(
       tf.layers.conv2d({
@@ -40,6 +41,7 @@ function createNetwork(width, height, nClasses) {
       })
     );
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
+    // model.add(tf.layers.batchNormalization());
 
     model.add(
       tf.layers.conv2d({
@@ -51,6 +53,7 @@ function createNetwork(width, height, nClasses) {
       })
     );
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2], strides: [2, 2] }));
+    // model.add(tf.layers.batchNormalization());
     // ++
     // model.add(
     //   tf.layers.conv2d({
@@ -67,7 +70,7 @@ function createNetwork(width, height, nClasses) {
     model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
-        units: 200,
+        units: 2000,
         activation: 'relu',
       })
     );
@@ -108,7 +111,7 @@ function createNetwork(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 20,
+      epochs: 50,
       shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,

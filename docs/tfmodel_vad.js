@@ -28,6 +28,8 @@ function createNetwork_VAD(width, height, nClasses) {
         kernelInitializer: 'varianceScaling',
       })
     );
+    //model.add(tf.layers.batchNormalization());
+
     model.add(
       tf.layers.conv2d({
         kernelSize: [5, 5],
@@ -38,25 +40,29 @@ function createNetwork_VAD(width, height, nClasses) {
         kernelInitializer: 'varianceScaling',
       })
     );
+    //model.add(tf.layers.batchNormalization());
+
     model.add(
       tf.layers.conv2d({
         kernelSize: [5, 5],
         padding: 'same', // TODO: check influence
-        filters: 32,
+        filters: 24,
         strides: 2,
         activation: 'relu',
         kernelInitializer: 'varianceScaling',
       })
     );
+    //model.add(tf.layers.batchNormalization());
+
     model.add(tf.layers.flatten());
-    model.add(tf.layers.dropout({ rate: 0.5 }));
+    model.add(tf.layers.dropout({ rate: 0.25 }));
     model.add(
       tf.layers.dense({
-        units: 200,
+        units: 100,
         activation: 'relu',
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.25 }));
+    model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(
       tf.layers.dense({
         units: NUM_OUTPUT_CLASSES,
@@ -102,7 +108,7 @@ function createNetwork_VAD(width, height, nClasses) {
 
     return model.fit(xs, ys, {
       batchSize: BATCH_SIZE,
-      epochs: 20,
+      epochs: 40,
       shuffle: true,
       //validationSplit: 0.2,
       callbacks: onEpochEnd,
