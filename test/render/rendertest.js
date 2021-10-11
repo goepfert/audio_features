@@ -33,12 +33,12 @@ function render() {
   requestAnimationFrame(render);
 }
 
-render();
+//render();
 
 function draw() {
-
   //console.log('draw');
-  let _context = canvas.offScreenCanvas.getContext('2d');
+  //let _context = canvas.offScreenCanvas.getContext('2d');
+  let _context = canvas.getContext('2d');
   let w = canvas.offScreenCanvas.width;
   let h = canvas.offScreenCanvas.height;
 
@@ -55,7 +55,7 @@ function draw() {
   for (let xidx = DFT_Series_pos + 1; xidx <= DFT_Series_pos + FRAMESIZE; xidx++) {
     ypos = h;
     for (let yidx = 0; yidx < B2P1; yidx++) {
-      _context.fillStyle = rainbow[Math.floor((Math.random() * 255))];
+      _context.fillStyle = rainbow[Math.floor(Math.random() * 255)];
       _context.fillRect(xpos, ypos, rectWidth, -rectHeight);
       ypos -= rectHeight;
     }
@@ -63,8 +63,9 @@ function draw() {
   }
   _context.strokeRect(0, 0, w, h);
 
-  setTimeout(draw, 100);
-};
+  //setTimeout(draw, 100);
+  requestAnimationFrame(draw);
+}
 
 draw();
 

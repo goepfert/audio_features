@@ -4,7 +4,7 @@
 
 'use strict';
 
-let mel_filter = function () {
+const create_melfilter = function () {
   let _samplerate;
   let _nfft;
   let _lowFreq;

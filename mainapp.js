@@ -41,7 +41,7 @@ const B2P1 = FRAME_SIZE / 2 + 1; // Length of frequency domain data
 
 // Mel Filter
 const N_MEL_FILTER = 40; // Number of Mel Filterbanks (power of 2 for DCT)
-const filter = mel_filter();
+const filter = create_melfilter();
 const MIN_FREQUENCY = 300; // lower end of first mel filter bank
 // TODO: if we cut off frequencies above 8 kHz, we may save some mips if we downsample e.g. to 16 kHz before (low pass and taking every third sample if we have 48 kHz)
 const MAX_FREQUENCY = 8000; // upper end of last mel filterbank
@@ -238,7 +238,14 @@ const handleSuccess = function (stream) {
  * https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia
  */
 navigator.mediaDevices
-  .getUserMedia({ audio: true, video: false })
+  .getUserMedia({
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    },
+    video: false,
+  })
   .then(handleSuccess)
   .catch((err) => console.log(err));
 
