@@ -337,7 +337,7 @@ function doVAD() {
 
     console.log(result[1]);
 
-    if (result[1] === NaN) {
+    if (isNaN(result[1])) {
       console.log(VAD_IMG);
     }
 
