@@ -277,13 +277,12 @@ function doFraming() {
     // MelFilter;
     let mel_array = filter.getMelCoefficients(mag);
 
-    console.log(mel_array);
-
-    // for (let idx = 0; idx < mel_array.length; idx++) {
-    //   if (isNaN(mel_array[idx])) {
-    //     mel_array[idx] = 0;
-    //   }
-    // }
+    for (let idx = 0; idx < mel_array.length; idx++) {
+      if (!mel_array[idx]) {
+        // Matches +0, -0, NaN
+        mel_array[idx] = 1e-6;
+      }
+    }
 
     MEL_RAW[Data_Pos] = mel_array;
     LOG_MEL[Data_Pos] = utils.logRangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
