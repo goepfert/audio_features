@@ -178,7 +178,7 @@ let label_speech = [];
     //create speech canvas dynamically
     const container = document.getElementById('speech meter container');
 
-    const classnames = ['one', 'two', 'three', 'four', 'up', 'down', 'left', 'right', 'other'];
+    const classnames = ['one', 'two', 'three', 'four', 'left', 'right', 'up', 'down', 'other'];
 
     for (let classIdx = 0; classIdx < NCLASSES; classIdx++) {
       const subcontainer = document.createElement('div');
