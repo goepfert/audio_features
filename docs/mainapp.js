@@ -337,6 +337,10 @@ function doVAD() {
 
     console.log(result[1]);
 
+    if (result[1] === NaN) {
+      console.log(VAD_IMG);
+    }
+
     let hit = false;
     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
       if (curpos == vad_prevEndPos) {
