@@ -56,7 +56,7 @@ const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) /
 console.log('VAD TIME', VAD_TIME);
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD saved in an array
-const VAD_THRESHOLD = 0.6; // the VAD threshold, if hit do speech recognition otherwise not
+let VAD_THRESHOLD = 0.6; // the VAD threshold, if hit do speech recognition otherwise not
 const THRESHOLD = 0.85; // threshold if speech class is recognized or not
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
