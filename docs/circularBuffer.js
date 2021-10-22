@@ -26,6 +26,12 @@ class CircularBuffer {
       console.log('buffer.length', buffer.length);
       throw new Error('Argument should be an AudioBuffer instance and comply with some assumptions');
     }
+
+    for (let idx = 0; idx < buffer.length; idx++) {
+      if (isNaN(buffer[idx])) {
+        buffer[idx] = 0;
+      }
+    }
   }
 
   /**
