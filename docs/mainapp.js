@@ -335,6 +335,8 @@ function doVAD() {
     const res = model_vad.predict(x);
     const result = res.dataSync();
 
+    console.log(result[1]);
+
     let hit = false;
     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
       if (curpos == vad_prevEndPos) {
