@@ -32,6 +32,8 @@
         <div class="meter_vad" id="meter_vad">
           <h3>Voice Activity Detection</h3>
           <canvas id="vad meter" height="0"></canvas>
+          <label>Threshold <span id="vad_threshold"></span></label>
+          <input type="range" step="0.1" min="0" max="1" value="0.6" id="vad_slider" />
         </div>
 
         <div class="meter_speech" id="meter_speech">

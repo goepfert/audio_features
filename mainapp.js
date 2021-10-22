@@ -54,7 +54,7 @@ const VAD_TIME = utils.getSizeOfBuffer(N_MEL_FILTER, FRAME_SIZE, FRAME_STRIDE) /
 console.log('VAD TIME', VAD_TIME);
 const VAD_IMG = [];
 const VAD_RESULT = []; // result of VAD saved in an array
-const VAD_THRESHOLD = 0.6; // the VAD threshold, if hit do speech recognition otherwise not
+let VAD_THRESHOLD = 0.6; // the VAD threshold, if hit do speech recognition otherwise not
 const THRESHOLD = 0.9; // threshold if speech class is recognized or not
 const VAD_N_SNAPSHOTS = 10;
 const VAD_OVERLAP = 0.5;
@@ -84,7 +84,8 @@ let model_vad;
 
 //const NORMALIZE_FCN = utils.minMaxNormalize;
 //const NORMALIZE_FCN = utils.meanNormalize;
-const NORMALIZE_FCN = utils.standardize;
+const NORMALIZE_FCN = utils.minMaxNormalize;
+const NORMALIZE_FCN_VAD = utils.minMaxNormalize;
 
 const SPEECH_IMG = [];
 const PRED_INTERVAL = 250;
@@ -275,7 +276,7 @@ function doFraming() {
     const mag = fft.getPowerspectrum(frame_buffer);
     DFT_Data[Data_Pos] = utils.logRangeMapBuffer(mag, MIN_EXP, MAX_EXP, 255, 0);
 
-    //let mel_array = filter.getLogMelCoefficients(mag);
+    // Apply mel filter
     let mel_array = filter.getMelCoefficients(mag);
 
     MEL_RAW[Data_Pos] = mel_array;
@@ -307,9 +308,7 @@ function doVAD() {
   showMeter_VAD();
 
   let curpos = vad_nextStartPos;
-  let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
-
-  //console.log('a', vad_nextStartPos, endPos, vad_prevEndPos);
+  const endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
 
   // copy image
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
@@ -324,8 +323,8 @@ function doVAD() {
     }
   }
 
-  utils.powerToDecibels2D(VAD_IMG);
-  //NORMALIZE_FCN(VAD_IMG);
+  //utils.powerToDecibels2D(VAD_IMG);
+  NORMALIZE_FCN_VAD(VAD_IMG);
 
   // make vad prediction and fill result
   // do some averaging when overlapping (does not look very efficient though)
@@ -337,8 +336,6 @@ function doVAD() {
 
     const res = model_vad.predict(x);
     const result = res.dataSync();
-
-    // console.log('b', vad_nextStartPos, endPos, vad_prevEndPos);
 
     let hit = false;
     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
@@ -356,24 +353,20 @@ function doVAD() {
         curpos = 0;
       }
       if (curpos == endPos) {
+        vad_prevEndPos = curpos;
         break;
       }
-      // do it in here :)
-      vad_prevEndPos = endPos;
     }
   });
 
-  // last
-  VAD_LAST_POS = vad_nextStartPos + VAD_SIZE;
   // new pos with some overlap
   vad_nextStartPos = Math.round(vad_nextStartPos + (1 - VAD_OVERLAP) * VAD_SIZE);
-
   vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
-  VAD_LAST_POS = VAD_LAST_POS % RB_SIZE_FRAMING;
+
+  // save last
+  VAD_LAST_POS = endPos;
 
   averageVAD(Data_Pos);
-
-  //console.log(VAD_AVERAGE);
 }
 
 /**
@@ -596,6 +589,16 @@ const draw = function () {
 
 draw();
 
+//vad slider
+const vad_slider = document.getElementById('vad_slider');
+let vad_value = document.getElementById('vad_threshold');
+vad_slider.value = VAD_THRESHOLD;
+vad_value.innerHTML = vad_slider.value;
+vad_slider.oninput = function () {
+  vad_value.innerHTML = this.value;
+  VAD_THRESHOLD = Number(this.value);
+};
+
 // Create record buttons for classification
 const record_btns_div = document.getElementById('record_btns');
 for (let idx = 0; idx < NCLASSES; idx++) {
@@ -656,7 +659,7 @@ function record(e, label) {
     }
   }
 
-  utils.powerToDecibels2D(image);
+  //utils.powerToDecibels2D(image);
   NORMALIZE_FCN(image);
 
   dataset_speech.addImage(image, label);
@@ -707,8 +710,8 @@ function record_vad(e, label) {
     }
   }
 
-  utils.powerToDecibels2D(image);
-  //NORMALIZE_FCN(image);
+  //utils.powerToDecibels2D(image);
+  NORMALIZE_FCN_VAD(image);
 
   label = label.split(' ')[1]; // lovely ... :(
   dataset_vad.addImage(image, label);
@@ -845,7 +848,7 @@ function predict(endFrame) {
       }
     }
 
-    utils.powerToDecibels2D(image);
+    //utils.powerToDecibels2D(image);
     NORMALIZE_FCN(image); //check which what option the nn was trained!
 
     let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);

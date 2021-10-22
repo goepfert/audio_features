@@ -28,6 +28,8 @@
         <div class="meter_vad" id="meter_vad">
           <h3>Voice Activity Detection</h3>
           <canvas id="vad meter" height="0"></canvas>
+          <label>Threshold <span id="vad_threshold"></span></label>
+          <input type="range" step="0.1" min="0" max="1" value="0.6" id="vad_slider" />
         </div>
 
         <div class="meter_speech" id="meter_speech">
@@ -44,13 +46,13 @@
 
       <div class="speech-section" id="speech-section">
         <div class="row">
-          <input type="file" value="" id="download-model-speech" accept=".json,.bin" multiple style="display: none;" />
+          <input type="file" value="" id="download-model-speech" accept=".json,.bin" multiple style="display: none" />
           <label for="download-model-speech" class="button">Load model</label>
           <label for="download-model-speech">not selected</label>
         </div>
 
         <div class="row">
-          <input type="file" value="" id="download-data-speech" accept=".txt" style="display: none;" />
+          <input type="file" value="" id="download-data-speech" accept=".txt" style="display: none" />
           <label for="download-data-speech" class="button">Load data</label>
           <label for="download-data-speech">not selected</label>
         </div>
@@ -80,13 +82,13 @@
 
       <div class="vad-section" id="vad-section">
         <div class="row">
-          <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none;" />
+          <input type="file" value="" id="download-model-vad" accept=".json,.bin" multiple style="display: none" />
           <label for="download-model-vad" class="button">Load model</label>
           <label for="download-model-vad">not selected</label>
         </div>
 
         <div class="row">
-          <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none;" />
+          <input type="file" value="" id="download-data-vad" accept=".txt" style="display: none" />
           <label for="download-data-vad" class="button">Load data</label>
           <label for="download-data-vad">not selected</label>
         </div>

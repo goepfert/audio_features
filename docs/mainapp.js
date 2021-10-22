@@ -84,7 +84,8 @@ let model_speech;
 const nn_vad = createNetwork_VAD(N_MEL_FILTER, N_MEL_FILTER, 2);
 let model_vad;
 
-const NORMALIZE_FCN = utils.standardize;
+const NORMALIZE_FCN = utils.minMaxNormalize;
+const NORMALIZE_FCN_VAD = utils.minMaxNormalize;
 
 const SPEECH_IMG = [];
 const PRED_INTERVAL = 250;
@@ -307,8 +308,6 @@ function doVAD() {
   let curpos = vad_nextStartPos;
   let endPos = (vad_nextStartPos + VAD_SIZE) % RB_SIZE_FRAMING;
 
-  //console.log('a', vad_nextStartPos, endPos, vad_prevEndPos);
-
   // copy image
   for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
     VAD_IMG[idx] = Array.from(MEL_RAW[curpos]);
@@ -322,8 +321,8 @@ function doVAD() {
     }
   }
 
-  utils.powerToDecibels2D(VAD_IMG);
-  //NORMALIZE_FCN(VAD_IMG);
+  //utils.powerToDecibels2D(VAD_IMG);
+  NORMALIZE_FCN_VAD(VAD_IMG);
 
   // make vad prediction and fill result
   // do some averaging when overlapping (does not look very efficient though)
@@ -335,8 +334,6 @@ function doVAD() {
 
     const res = model_vad.predict(x);
     const result = res.dataSync();
-
-    // console.log('b', vad_nextStartPos, endPos, vad_prevEndPos);
 
     let hit = false;
     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
@@ -354,24 +351,20 @@ function doVAD() {
         curpos = 0;
       }
       if (curpos == endPos) {
+        vad_prevEndPos = curpos;
         break;
       }
-      // do it in here :)
-      vad_prevEndPos = endPos;
     }
   });
 
-  // last
-  VAD_LAST_POS = vad_nextStartPos + VAD_SIZE;
   // new pos with some overlap
   vad_nextStartPos = Math.round(vad_nextStartPos + (1 - VAD_OVERLAP) * VAD_SIZE);
-
   vad_nextStartPos = vad_nextStartPos % RB_SIZE_FRAMING;
-  VAD_LAST_POS = VAD_LAST_POS % RB_SIZE_FRAMING;
+
+  // save last
+  VAD_LAST_POS = endPos;
 
   averageVAD(Data_Pos);
-
-  //console.log(VAD_AVERAGE);
 }
 
 /**
@@ -594,6 +587,16 @@ const draw = function () {
 
 draw();
 
+//vad slider
+const vad_slider = document.getElementById('vad_slider');
+let vad_value = document.getElementById('vad_threshold');
+vad_slider.value = VAD_THRESHOLD;
+vad_value.innerHTML = vad_slider.value;
+vad_slider.oninput = function () {
+  vad_value.innerHTML = this.value;
+  VAD_THRESHOLD = Number(this.value);
+};
+
 /**
  * Predict section
  */
@@ -627,7 +630,7 @@ function predict(endFrame) {
       }
     }
 
-    utils.powerToDecibels2D(image);
+    //utils.powerToDecibels2D(image);
     NORMALIZE_FCN(image); //check which what option the nn was trained!
 
     let x = tf.tensor2d(image).reshape([1, RECORD_SIZE_FRAMING, N_MEL_FILTER, 1]);
