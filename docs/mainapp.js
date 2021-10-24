@@ -268,6 +268,10 @@ function doFraming() {
   for (let idx = 0; idx < nFrames; idx++) {
     let frame_buffer = timeDomainData.getSlice(startPos, endPos);
 
+    // frame_buffer.forEach((e, idx) => {
+    //   frame_buffer[idx] = 0;
+    // });
+
     // Windowing
     fenster.hamming(frame_buffer);
 
@@ -325,6 +329,23 @@ function doVAD() {
 
   //utils.powerToDecibels2D(VAD_IMG);
   NORMALIZE_FCN_VAD(VAD_IMG);
+  // console.log(VAD_IMG);
+
+  let min = 1e6;
+  let max = -1e6;
+  for (let idx1 = 0; idx1 < VAD_IMG.length; idx1++) {
+    for (let idx2 = 0; idx2 < VAD_IMG[idx1].length; idx2++) {
+      let val = VAD_IMG[idx1][idx2];
+      min = val < min ? val : min;
+      max = val > max ? val : max;
+    }
+  }
+
+  let res;
+  let width = max - min;
+  if (width == 0) {
+    res = 0;
+  }
 
   // make vad prediction and fill result
   // do some averaging when overlapping (does not look very efficient though)
@@ -334,8 +355,12 @@ function doVAD() {
     //get voice activity in current frame
     let x = tf.tensor2d(VAD_IMG).reshape([1, VAD_SIZE, N_MEL_FILTER, 1]);
 
-    const res = model_vad.predict(x);
-    const result = res.dataSync();
+    const prediction = model_vad.predict(x);
+    const result = prediction.dataSync();
+
+    if (res != 0) {
+      res = result[1];
+    }
 
     let hit = false;
     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {
@@ -343,9 +368,9 @@ function doVAD() {
         hit = true;
       }
       if (!hit) {
-        VAD_RESULT[curpos] = (VAD_RESULT[curpos] + result[1]) / 2;
+        VAD_RESULT[curpos] = (VAD_RESULT[curpos] + res) / 2;
       } else {
-        VAD_RESULT[curpos] = result[1];
+        VAD_RESULT[curpos] = res;
       }
 
       curpos++;
