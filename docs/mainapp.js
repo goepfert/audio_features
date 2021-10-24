@@ -267,6 +267,8 @@ function doFraming() {
   for (let idx = 0; idx < nFrames; idx++) {
     let frame_buffer = timeDomainData.getSlice(startPos, endPos);
 
+    console.log('fb', frame_buffer[0]);
+
     // Windowing
     fenster.hamming(frame_buffer);
 
@@ -277,12 +279,12 @@ function doFraming() {
     // MelFilter;
     let mel_array = filter.getMelCoefficients(mag);
 
-    for (let idx = 0; idx < mel_array.length; idx++) {
-      if (!mel_array[idx]) {
-        // Matches +0, -0, NaN
-        mel_array[idx] = 1e-6;
-      }
-    }
+    // for (let idx = 0; idx < mel_array.length; idx++) {
+    //   if (!mel_array[idx]) {
+    //     // Matches +0, -0, NaN
+    //     mel_array[idx] = 1e-6;
+    //   }
+    // }
 
     MEL_RAW[Data_Pos] = mel_array;
     LOG_MEL[Data_Pos] = utils.logRangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
@@ -345,7 +347,7 @@ function doVAD() {
     console.log(result[1]);
 
     if (isNaN(result[1])) {
-      console.log(VAD_IMG);
+      //console.log(VAD_IMG);
     }
 
     let hit = false;
