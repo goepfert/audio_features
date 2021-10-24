@@ -249,6 +249,7 @@ navigator.mediaDevices
   .catch((err) => console.log(err));
 
 let nextStartPos = 0;
+let once = true;
 function doFraming() {
   let headPos = timeDomainData.getHeadPos();
   let availableData = headPos - nextStartPos;
@@ -267,24 +268,16 @@ function doFraming() {
   for (let idx = 0; idx < nFrames; idx++) {
     let frame_buffer = timeDomainData.getSlice(startPos, endPos);
 
-    console.log('fb', frame_buffer[0]);
-
     // Windowing
     fenster.hamming(frame_buffer);
 
     // Fourier Transform
     const mag = fft.getPowerspectrum(frame_buffer);
+
     DFT_Data[Data_Pos] = utils.logRangeMapBuffer(mag, MIN_EXP, MAX_EXP, 255, 0);
 
     // MelFilter;
     let mel_array = filter.getMelCoefficients(mag);
-
-    // for (let idx = 0; idx < mel_array.length; idx++) {
-    //   if (!mel_array[idx]) {
-    //     // Matches +0, -0, NaN
-    //     mel_array[idx] = 1e-6;
-    //   }
-    // }
 
     MEL_RAW[Data_Pos] = mel_array;
     LOG_MEL[Data_Pos] = utils.logRangeMapBuffer(mel_array, MIN_EXP, MAX_EXP, 255, 0);
@@ -343,12 +336,6 @@ function doVAD() {
 
     const res = model_vad.predict(x);
     const result = res.dataSync();
-
-    console.log(result[1]);
-
-    if (isNaN(result[1])) {
-      //console.log(VAD_IMG);
-    }
 
     let hit = false;
     for (let idx = 0; idx < RB_SIZE_FRAMING; idx++) {

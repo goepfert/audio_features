@@ -150,9 +150,11 @@ const utils = (function () {
     }
     mean /= nRow * nCol;
 
-    // console.log(mean, min, max);
+    let width = max - min;
+    if (width == 0) {
+      width = 1;
+    }
 
-    const width = max - min;
     for (let row = 0; row < nRow; row++) {
       for (let col = 0; col < nCol; col++) {
         buffer2D[row][col] = (buffer2D[row][col] - min) / width;
