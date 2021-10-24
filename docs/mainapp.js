@@ -268,10 +268,6 @@ function doFraming() {
   for (let idx = 0; idx < nFrames; idx++) {
     let frame_buffer = timeDomainData.getSlice(startPos, endPos);
 
-    // frame_buffer.forEach((e, idx) => {
-    //   frame_buffer[idx] = 0;
-    // });
-
     // Windowing
     fenster.hamming(frame_buffer);
 
@@ -329,8 +325,9 @@ function doVAD() {
 
   //utils.powerToDecibels2D(VAD_IMG);
   NORMALIZE_FCN_VAD(VAD_IMG);
-  // console.log(VAD_IMG);
 
+  // check if everthing is zero
+  // if yes: result (vad) is zero
   let min = 1e6;
   let max = -1e6;
   for (let idx1 = 0; idx1 < VAD_IMG.length; idx1++) {
